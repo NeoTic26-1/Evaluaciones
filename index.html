@@ -207,6 +207,7 @@ input[type=datetime-local]{min-height:50px}
       <h2>¿Quién eres?</h2>
       <p class="muted">Elige una opción para entrar.</p>
     </div></div>
+    <p class="note" id="linkInfo" hidden></p>
     <div class="choices">
       <button class="choice" id="rAlumno" aria-pressed="false" type="button">
         <b>Soy alumno</b>
@@ -355,6 +356,13 @@ input[type=datetime-local]{min-height:50px}
     </div>
 
     <div class="view" id="tabLista" hidden>
+      <div class="sheet" id="pubBox" hidden>
+        <div class="sheet-head"><div><span class="step">Evaluación publicada</span><h2 id="pubTitle"></h2><p class="muted" id="pubSub"></p></div>
+          <button class="ghost small" id="pubClose" type="button">Cerrar</button></div>
+        <label>Enlace para los alumnos<input id="pubLink" type="text" readonly></label>
+        <p class="muted small-text">Envíalo a los alumnos de la sección (por WhatsApp, correo o aula virtual). Al abrirlo, solo escriben su número de lista y su apellido para empezar.</p>
+        <div class="row"><button id="pubCopy" type="button">Copiar enlace</button><button class="ghost" id="pubShare" type="button" hidden>Compartir</button><span></span></div>
+      </div>
       <div class="sheet">
         <div class="sheet-head"><div><h2>Mis evaluaciones</h2></div></div>
         <div class="filters" id="salonFilter" aria-label="Filtrar por sección"></div>
@@ -706,6 +714,7 @@ const STATUS_CHIP = {proxima:'<span class="chip brass">PRÓXIMA</span>', abierta
     fillSalones();
     renderTests();
     autoPurge();
+    applyLink();
   }, e => showNote("No se pudieron cargar las evaluaciones (" + (e.code || e.message) + "). Revisa las reglas de Firestore."));
 })();
 const RET_DAYS = 30;
@@ -745,6 +754,52 @@ function showNote(m){ $("dbNote").textContent = m; $("dbNote").hidden = false; }
 setInterval(() => { if (session && !current) renderTests(); }, 30000);
 
 /* ---------- Ingreso ---------- */
+/* ---------- Enlace directo a una evaluación ---------- */
+const linkFor = id => location.origin + location.pathname + "?e=" + encodeURIComponent(id);
+const linkId = new URLSearchParams(location.search).get("e");
+let linkUsed = false;
+async function copyText(txt, input){
+  try { await navigator.clipboard.writeText(txt); toast("Enlace copiado. Pégalo en el grupo de tus alumnos."); }
+  catch { if (input) { input.focus(); input.select(); } toast("Mantén presionado el enlace (o selecciónalo) y cópialo.", "info"); }
+}
+function showPublished(t){
+  $("pubTitle").textContent = t.titulo;
+  $("pubSub").textContent = `${salonName(salonOf(t))} · ${windowText(t)}`;
+  $("pubLink").value = linkFor(t.id);
+  $("pubShare").hidden = !navigator.share;
+  $("pubBox").hidden = false;
+}
+$("pubCopy").onclick = () => copyText($("pubLink").value, $("pubLink"));
+$("pubShare").onclick = async () => {
+  try { await navigator.share({title: $("pubTitle").textContent, text: `Evaluación "${$("pubTitle").textContent}" (${$("pubSub").textContent}). Entra aquí para rendirla:`, url: $("pubLink").value}); } catch {}
+};
+$("pubClose").onclick = () => { $("pubBox").hidden = true; };
+$("pubLink").addEventListener("focus", e => e.target.select());
+function applyLink(){
+  if (!linkId || session || linkUsed) return;
+  const t = tests.find(x => x.id === linkId);
+  if (!t) {
+    $("linkInfo").textContent = "Este enlace no corresponde a ninguna evaluación disponible: puede que ya se haya eliminado. Pide a tu docente un enlace nuevo, o entra normalmente.";
+    $("linkInfo").hidden = false; $("inSalonA").readOnly = false; return;
+  }
+  const st = statusOf(t);
+  $("linkInfo").innerHTML = `<b>${esc(t.titulo)}</b> · ${esc(salonName(salonOf(t)))}<br>` + (st === "abierta"
+    ? `Escribe tu número de lista y tu apellido para empezar. Disponible hasta las ${fmtHour(t.cierre)}`
+    : st === "proxima" ? `Podrás empezar recién desde el ${fmtDate(t.inicio)}` : "Esta evaluación ya cerró.");
+  $("linkInfo").hidden = false;
+  if (!$("vLogin").hidden && $("rProfe").getAttribute("aria-pressed") !== "true") pickRole("alumno");
+  $("inSalonA").value = salonOf(t); $("inSalonA").readOnly = true;
+}
+function followLink(){
+  if (!linkId || linkUsed) return;
+  const t = tests.find(x => x.id === linkId);
+  if (!t || !sameSec(salonOf(t), session.salon)) return;
+  linkUsed = true;
+  const st = statusOf(t);
+  if (st === "abierta") openTake(t);
+  else showNote(st === "proxima" ? `"${t.titulo}" todavía no abre. Vuelve a la hora indicada y tócala en "Por rendir": abre el ${fmtDate(t.inicio)}` : `"${t.titulo}" ya cerró.`);
+}
+
 function pickRole(r){
   $("rAlumno").setAttribute("aria-pressed", r==="alumno");
   $("rProfe").setAttribute("aria-pressed", r==="profe");
@@ -794,11 +849,13 @@ function enter(){
       renderTests();
       if (shown) { const upd = myResults.find(r => r.id === shown.id); if (upd) showDone(upd, false); }
     }, () => {});
+    followLink();
   } else loadDocDefaults();
   renderTests();
 }
 $("logout").onclick = () => guard(doLogout);
 function doLogout(){
+  linkUsed = false; setTimeout(applyLink, 0);
   revDirty = false; guardAction = null;
   stopTimer(); session = null; current = null; revDoc = null; shown = null; myResults = [];
   if (unsubRes) { unsubRes(); unsubRes = null; }
@@ -1060,12 +1117,14 @@ $("btnPub").onclick = async () => {
   const doc = {curso:$("inCurso").value.trim(), codigo:$("inCodigo").value.trim(), docente:$("inDocente").value.trim(), ciclo:$("inCiclo").value.trim()};
   $("btnPub").disabled = true;
   try {
-    await db.collection("tests").add({titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()});
+    const nuevo = {titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()};
+    const ref = await db.collection("tests").add(nuevo);
     salonSel = salon;
     db.doc("config/docInfo").set({...doc, salon}).catch(()=>{});
     resetCreate();
     toast("Evaluación publicada.");
     showTab("tabLista");
+    showPublished({id: ref.id, ...nuevo});
   } catch (e) { fail("No se pudo publicar: " + e.message); }
   finally { $("btnPub").disabled = false; }
 };
@@ -1077,6 +1136,7 @@ function testCard(t){ const st = statusOf(t); return `
           <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se borra el ${fmtDay(purgeAt(t))}` : ""}</span></div></div>
         <div class="actions">
           <button class="small" data-act="res" type="button">Ver entregas</button>
+          <button class="ghost small" data-act="link" type="button">Copiar enlace</button>
           <button class="ghost small" data-act="sched" type="button">Editar horario y sección</button>
           ${st === "abierta" ? '<button class="ghost small" data-act="closenow" type="button">Cerrar ahora</button>' : ""}
           <button class="danger small" data-act="del" type="button">Eliminar</button>
@@ -1145,6 +1205,7 @@ $("tList").addEventListener("click", async e => {
     try { await db.doc("tests/"+id).update({inicio:ini, cierre:fin, salon:sal}); toast("Cambios guardados."); } catch (x) { er.textContent = "No se pudo guardar: " + x.message; er.hidden = false; }
   }
   if (act === "res") guard(() => showResults(t));
+  if (act === "link") copyText(linkFor(id));
 });
 
 /* ---------- Entregas y corrección ---------- */
@@ -1310,9 +1371,11 @@ async function markAnnulled(id, motivo, extra = {}){
   return false;
 }
 
-$("aTests").addEventListener("click", async e => {
+$("aTests").addEventListener("click", e => {
   const b = e.target.closest("button[data-act=take]"); if (!b) return;
-  const t = tests.find(x => x.id === b.closest(".test").dataset.id); if (!t) return;
+  const t = tests.find(x => x.id === b.closest(".test").dataset.id); if (t) openTake(t, b);
+});
+async function openTake(t, b = {}){
   if (statusOf(t) !== "abierta") { renderTests(); return; }
   b.disabled = true;
   try {
@@ -1330,7 +1393,7 @@ $("aTests").addEventListener("click", async e => {
   $("warnSub").textContent = `${nPreg(t)} · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
   $("warnOk").checked = false; $("btnStart").disabled = true; $("warnErr").hidden = true;
   $("aHome").hidden = true; $("aWarn").hidden = false; window.scrollTo({top:0});
-});
+}
 $("warnOk").onchange = () => { $("btnStart").disabled = !$("warnOk").checked; };
 $("warnBack").onclick = showHome;
 $("btnStart").onclick = async () => {
@@ -1526,7 +1589,7 @@ function showDone(r, repeated, auto){
   $("doneSub").textContent = annulled
     ? `Tu evaluación fue anulada. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: solo él puede habilitarte para rendirla de nuevo.`
     : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
-      + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Entregada el ${fmtDate(r.fecha)}. Tu docente aún no asigna el puntaje.`)
+      + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Tu docente aún no asigna el puntaje (entregada el ${fmtDate(r.fecha)}).`)
       + (keepUntil(r) ? ` Descarga tu Word: estará disponible hasta el ${keepUntil(r)}.` : "");
   $("docxMsg").textContent = annulled ? "" : downloads ? "" : "La descarga no está disponible en esta vista.";
   $("btnDocx").hidden = !downloads || annulled;
