@@ -402,7 +402,7 @@ input[type=datetime-local]{min-height:50px}
         <div class="row"><button id="pubCopy" type="button">Copiar enlace</button><button class="ghost" id="pubShare" type="button" hidden>Compartir</button><span></span></div>
       </div>
       <div class="sheet">
-        <div class="sheet-head"><div><h2>Mis evaluaciones</h2><p class="muted" id="listHint"></p></div></div>
+        <div class="sheet-head"><div><h2>Mis evaluaciones</h2><p class="muted" id="listHint"></p><p class="muted small-text" id="spaceInfo" hidden></p></div></div>
         <div class="secnav" id="secNav" hidden><button class="ghost small" id="secBack" type="button">← Secciones</button><h3 id="secTitle"></h3></div>
         <div class="row" id="secPdfRow" hidden style="align-items:center"><button class="btn-pdf" data-pdf type="button">Descargar tabla de resultados (PDF)</button><span class="muted small-text" id="secPdfMsg"></span></div>
         <div class="tests" id="tList"><div class="empty">Aún no hay evaluaciones. Créala en “Crear evaluación”.</div></div>
@@ -783,10 +783,16 @@ const STATUS_CHIP = {proxima:'<span class="chip brass">PRÓXIMA</span>', abierta
     applyLink();
   }, e => showNote("No se pudieron cargar las evaluaciones (" + (e.code || e.message) + "). Revisa las reglas de Firestore."));
 })();
-const RET_DAYS = 30;
+// Conservación: hasta MAX_DAYS después del cierre; si el espacio se acerca al límite,
+// se borran primero las evaluaciones más antiguas, pero nunca antes de MIN_DAYS.
+const MAX_DAYS = 180, MIN_DAYS = 30, LIMIT_BYTES = 1e9, BUDGET_BYTES = 0.7e9;
 const nPreg = t => { const n = t.preguntas?.length || 0; return n === 1 ? "1 pregunta" : n + " preguntas"; };
-const purgeAt = t => (t.cierre || 0) + RET_DAYS * 864e5;
-const keepUntil = r => { const t = tests.find(x => x.id === r.testId); return t ? fmtDay(purgeAt(t)) : null; };
+const purgeAt = t => (t.cierre || 0) + MAX_DAYS * 864e5;
+const minAt = t => (t.cierre || 0) + MIN_DAYS * 864e5;
+const keepUntil = r => { const t = tests.find(x => x.id === r.testId); return t ? fmtDay(minAt(t)) : null; };
+const resBytes = r => 6000 + (r.fotosBytes ?? (r.fotos || []).reduce((s, n) => s + (n || 0), 0) * 200000);
+const estBytes = t => 5000 + allRes.filter(r => r.testId === t.id).reduce((s, r) => s + resBytes(r), 0);
+const usedBytes = () => tests.reduce((s, t) => s + estBytes(t), 0);
 async function deleteEvaluation(id){
   for (const col of ["fotos", "resultados"]) {
     const s = await db.collection(col).where("testId", "==", id).get();
@@ -794,14 +800,25 @@ async function deleteEvaluation(id){
   }
   await db.doc("tests/" + id).delete();
 }
-let purgeDone = false;
+let purgeDone = false, allResLoaded = false;
 async function autoPurge(){
-  if (purgeDone || !db || session?.rol !== "profe") return;
+  if (purgeDone || !db || session?.rol !== "profe" || !allResLoaded) return;
   purgeDone = true;
-  const old = tests.filter(t => Date.now() > purgeAt(t));
-  let n = 0;
-  for (const t of old) { try { await deleteEvaluation(t.id); n++; } catch {} }
-  if (n) toast((n > 1 ? `Se borraron automáticamente ${n} evaluaciones` : "Se borró automáticamente 1 evaluación") + ` con más de ${RET_DAYS} días de cerrada, junto con sus entregas y fotos.`, "info");
+  const now = Date.now(), closed = tests.filter(t => statusOf(t) === "cerrada").sort((a, b) => a.cierre - b.cierre);
+  const aged = new Set(closed.filter(t => now > purgeAt(t)).map(t => t.id)), del = new Set(aged);
+  let total = usedBytes() - closed.filter(t => del.has(t.id)).reduce((s, t) => s + estBytes(t), 0);
+  for (const t of closed) {
+    if (total <= BUDGET_BYTES) break;
+    if (del.has(t.id) || now < minAt(t)) continue;
+    del.add(t.id); total -= estBytes(t);
+  }
+  let nAged = 0, nSpace = 0;
+  for (const id of del) { try { await deleteEvaluation(id); aged.has(id) ? nAged++ : nSpace++; } catch {} }
+  const msgs = [];
+  if (nAged) msgs.push(`${nAged > 1 ? `Se borraron ${nAged} evaluaciones` : "Se borró 1 evaluación"} con más de 6 meses de cerrada.`);
+  if (nSpace) msgs.push(`${nSpace > 1 ? `Se borraron las ${nSpace} evaluaciones más antiguas` : "Se borró la evaluación más antigua"} para liberar espacio.`);
+  if (msgs.length) toast(msgs.join(" ") + " Se borraron también sus entregas y fotos.", "info");
+  if (total > BUDGET_BYTES) toast("La base de datos está casi llena y no hay evaluaciones con más de 30 días de cerradas para borrar. Elimina a mano alguna evaluación que ya no necesites.", "info");
 }
 const salonOf = t => cleanSalon(t?.salon) || "Sin sección";
 const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
@@ -919,7 +936,7 @@ function enter(){
   $("vAlumno").hidden = session.rol!=="alumno";
   if (session.rol==="profe") {
     secOpen = null; showTab(tests.length ? "tabLista" : "tabNueva"); autoPurge();
-    unsubAll = db.collection("resultados").onSnapshot(s => { allRes = s.docs.map(d => ({id:d.id, ...d.data()})); renderTests(); }, () => {});
+    unsubAll = db.collection("resultados").onSnapshot(s => { allRes = s.docs.map(d => ({id:d.id, ...d.data()})); allResLoaded = true; renderTests(); autoPurge(); }, () => {});
   }
   if (session.rol==="alumno") {
     showHome();
@@ -940,7 +957,7 @@ function doLogout(){
   stopTimer(); session = null; current = null; revDoc = null; shown = null; myResults = [];
   if (unsubRes) { unsubRes(); unsubRes = null; }
   if (unsubMine) { unsubMine(); unsubMine = null; }
-  if (unsubAll) { unsubAll(); unsubAll = null; } allRes = [];
+  if (unsubAll) { unsubAll(); unsubAll = null; } allRes = []; allResLoaded = false;
   ["vProfe","vAlumno","who","resBox","revBox"].forEach(id => $(id).hidden = true);
   $("vLogin").hidden = false; $("inApellido").value = ""; $("inLista").value = "";
   pickRole(null);
@@ -1214,7 +1231,7 @@ $("btnPub").onclick = async () => {
 function testCard(t){ const st = statusOf(t), k = stats(new Set([t.id])); return `
       <div class="test${k.sus ? " sus" : ""}" data-id="${t.id}">
         <div class="meta"><h3>${esc(t.titulo)}</h3>
-          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se borra el ${fmtDay(purgeAt(t))}` : ""}</span></div>
+          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se guarda hasta el ${fmtDay(purgeAt(t))}` : ""}</span></div>
           <div class="who"><span>${k.entregas ? cnt(k.entregas, "entrega", "entregas") : "Sin entregas aún"}${k.pend ? ` · <b>${k.pend} por calificar</b>` : ""}${k.ina ? ` · ${cnt(k.ina, "inasistencia", "inasistencias")}` : ""}</span>${k.sus ? `<span class="chip red">${cnt(k.sus, "sospecha de IA", "sospechas de IA")}</span>` : ""}</div></div>
         <div class="actions">
           <button class="small" data-act="res" type="button">Ver entregas</button>
@@ -1247,6 +1264,9 @@ function renderTests(){
     if (secOpen && !ss.includes(secOpen)) secOpen = null;
     $("secNav").hidden = !secOpen; if (!secOpen) $("secPdfRow").hidden = true;
     $("listHint").textContent = !secOpen && ss.length ? "Elige una sección para ver sus evaluaciones." : "";
+    const used = usedBytes(), mb = n => n >= 1e9 ? (n / 1e9).toLocaleString("es-PE", {maximumFractionDigits: 2}) + " GB" : Math.max(1, Math.round(n / 1e6)) + " MB";
+    $("spaceInfo").hidden = !allResLoaded || !ss.length || !!secOpen;
+    $("spaceInfo").textContent = `Espacio usado (aprox.): ${mb(used)} de 1 GB.` + (used > BUDGET_BYTES ? " El espacio está casi lleno: elimina las evaluaciones que ya no necesites." : "");
     if (!secOpen) {
       $("tList").innerHTML = ss.length ? `<div class="secgrid">${ss.map(s => {
         const ts = tests.filter(t => salonOf(t) === s), k = stats(new Set(ts.map(t => t.id))), open = ts.filter(t => statusOf(t) === "abierta").length;
@@ -1275,7 +1295,7 @@ function renderTests(){
       </div>`; }).join("") : '<div class="empty">No tienes evaluaciones pendientes. Cuando tu profesor publique una, aparecerá aquí.</div>';
     $("aPast").innerHTML = myResults.length ? myResults.map(r => `
       <div class="test${r.estado === "anulada" ? " sus" : r.estado === "inasistencia" ? " ina" : ""}" data-rid="${esc(r.id)}">
-        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA · SOSPECHA DE IA</span>' : r.estado === "inasistencia" ? '<span class="chip ina">ANULADA · INASISTENCIA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "inasistencia" ? "Nota: 0" : (r.estado === "anulada" ? "Anulada " : "Entregada ") + fmtDate(r.fecha)}${r.estado !== "anulada" && r.estado !== "inasistencia" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
+        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA · SOSPECHA DE IA</span>' : r.estado === "inasistencia" ? '<span class="chip ina">ANULADA · INASISTENCIA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "inasistencia" ? "Nota: 0" : (r.estado === "anulada" ? "Anulada " : "Entregada ") + fmtDate(r.fecha)}${r.estado !== "anulada" && r.estado !== "inasistencia" && keepUntil(r) ? ` · disponible al menos hasta el ${keepUntil(r)}` : ""}</span></div></div>
         <div class="actions"><button class="small" data-act="view" type="button">Ver</button>${r.estado === "anulada" || r.estado === "en_curso" || r.estado === "inasistencia" ? "" : '<button class="ghost small" data-act="docx" type="button">Descargar Word</button>'}</div>
       </div>`).join("") : '<div class="empty">Todavía no has entregado evaluaciones.</div>';
   }
@@ -1846,7 +1866,7 @@ async function deliver(auto){
         await db.doc(`fotos/${id}_${i}_${k}`).set({resultId:id, testId:t.id, lista:session.lista, q:i, k, ...takeFotos[i][k]});
     const data = {testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido, respuestas, fotos,
       preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), doc: {...(t.doc||{}), fecha: fmtDay(t.inicio)},
-      estado:"entregada", puntos:null, puntaje:null, fecha:Date.now(), automatica:auto};
+      estado:"entregada", puntos:null, puntaje:null, fecha:Date.now(), automatica:auto, fotosBytes: takeFotos.flat().reduce((s, f) => s + (f.data?.length || 0), 0)};
     await ref.set(data);
     try { localStorage.removeItem(flagKey(id)); } catch {}
     stopTimer(); showDone({id, ...data}, false, auto);
@@ -1882,7 +1902,7 @@ function showDone(r, repeated, auto){
     ? `Tu evaluación fue anulada por sospecha de uso de IA. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: puede quitar la sospecha o habilitarte para rendirla de nuevo.`
     : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
       + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Tu docente aún no asigna el puntaje (entregada el ${fmtDate(r.fecha)}).`)
-      + (keepUntil(r) ? ` Descarga tu Word: estará disponible hasta el ${keepUntil(r)}.` : "");
+      + (keepUntil(r) ? ` Descarga tu Word cuanto antes: estará disponible al menos hasta el ${keepUntil(r)} (normalmente, hasta 6 meses después del cierre).` : "");
   $("docxMsg").textContent = annulled ? "" : downloads ? "" : "La descarga no está disponible en esta vista.";
   $("btnDocx").hidden = !downloads || annulled;
   $("doneList").innerHTML = (r.preguntas||[]).map((q,i) => {
