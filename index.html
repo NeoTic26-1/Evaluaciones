@@ -201,6 +201,7 @@ tbody tr.ina td:first-child{box-shadow:inset 4px 0 0 #3f3a39}
 .comment{font-weight:600;font-size:15px;color:var(--muted)}
 .comment textarea{font-weight:400;font-size:16px;color:var(--fg);min-height:64px}
 .teacher-note{padding:12px 14px;border-radius:10px;background:var(--pri-soft);border-left:4px solid var(--pri);white-space:pre-wrap;overflow-wrap:anywhere}
+input[readonly]:not(#inSalonA){background:var(--bg);color:var(--muted);cursor:default}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
 .pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
@@ -309,7 +310,7 @@ input[type=datetime-local]{min-height:50px}
             <label style="flex:0 1 170px">Código<input id="inCodigo" type="text" placeholder="BFI 01 B/ F"></label>
           </div>
           <div class="row">
-            <label>Docente<input id="inDocente" type="text" placeholder="Mag. Nombre Apellido"></label>
+            <label>Docente<input id="inDocente" type="text" value="Mg. Joaquín Salcedo" readonly tabindex="-1"></label>
             <label style="flex:0 1 170px">Ciclo<input id="inCiclo" type="text" placeholder="26 2"></label>
           </div>
         </div>
@@ -722,6 +723,7 @@ const CREST = "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAsICAgJCAwJCQwRCwoLERQPDAwPFBcSE
 <script>
 const $ = id => document.getElementById(id);
 const DEFAULT_CLAVE = "12345";
+const DOCENTE = "Mg. Joaquín Salcedo";
 const MAX_FOTOS = 4;
 let db = null, sample = null, downloads = null;
 let session = null;
@@ -1134,7 +1136,7 @@ CONTENIDO:
 /* ---------- Editor ---------- */
 async function loadDocDefaults(){
   try { const c = await db.doc("config/docInfo").get(); if (c.exists) { const d = c.data();
-    ["curso","codigo","docente","ciclo","salon"].forEach(k => { const el = $("in" + k[0].toUpperCase() + k.slice(1)); if (!el.value && d[k]) el.value = d[k]; }); } } catch {}
+    ["curso","codigo","ciclo","salon"].forEach(k => { const el = $("in" + k[0].toUpperCase() + k.slice(1)); if (!el.value && d[k]) el.value = d[k]; }); } } catch {}
 }
 function openEditor(){
   renderEditor();
@@ -1193,7 +1195,7 @@ $("btnPub").onclick = async () => {
   if (e1) { showStep1(true); $("step1Err").textContent = e1; $("step1Err").hidden = false; $("step1").scrollIntoView({behavior:"smooth", block:"start"}); return fail("Revisa los datos del paso 1: " + e1); }
   const inicio = new Date($("inInicio").value).getTime(), cierre = new Date($("inCierre").value).getTime();
   const salon = cleanSalon($("inSalon").value);
-  const doc = {curso:$("inCurso").value.trim(), codigo:$("inCodigo").value.trim(), docente:$("inDocente").value.trim(), ciclo:$("inCiclo").value.trim()};
+  const doc = {curso:$("inCurso").value.trim(), codigo:$("inCodigo").value.trim(), docente:DOCENTE, ciclo:$("inCiclo").value.trim()};
   $("btnPub").disabled = true;
   try {
     const nuevo = {titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()};
@@ -1372,7 +1374,7 @@ async function sectionPdf(sec){
   doc.setTextColor(30, 26, 26); doc.setFont("helvetica", "bold"); doc.setFontSize(14);
   doc.text(`Tabla de resultados · Sección ${sec}`, M, 41);
   const info = [...ts].reverse().find(t => t.doc && (t.doc.curso || t.doc.docente))?.doc || {};
-  const line = [info.curso && "Curso: " + info.curso, info.codigo && "Código: " + info.codigo, info.docente && "Docente: " + info.docente, info.ciclo && "Ciclo: " + info.ciclo].filter(Boolean).join("   ·   ");
+  const line = [info.curso && "Curso: " + info.curso, info.codigo && "Código: " + info.codigo, "Docente: " + DOCENTE, info.ciclo && "Ciclo: " + info.ciclo].filter(Boolean).join("   ·   ");
   doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(95, 88, 86);
   let y = 47;
   if (line) { doc.text(line, M, y); y += 5.5; }
@@ -1901,7 +1903,7 @@ async function downloadDocx(r, btn){
   try {
     const fotos = (r.fotos||[]).some(n => n > 0) ? await fotosOf(r.id) : [];
     const bytes = await DocxBuilder.build(JSZip, CREST, {
-      info: {seccion: cleanSalon(r.salon), curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:r.doc?.docente||"", ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
+      info: {seccion: cleanSalon(r.salon), curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:DOCENTE, ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
       titulo:r.titulo, lista:r.lista, apellido:r.apellido, preguntas:r.preguntas||[], respuestas:r.respuestas||[], fotos,
       puntos: r.estado === "corregida" ? r.puntos : null, comentarios: r.estado === "corregida" ? r.comentarios : null, total:r.total, puntaje:r.puntaje||0, entregado: fmtDate(r.fecha), fmt});
     const name = asciiName(`${r.titulo} - ${String(r.lista).padStart(2,"0")} ${r.apellido}.docx`);
