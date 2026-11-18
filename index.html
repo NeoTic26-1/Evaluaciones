@@ -783,9 +783,8 @@ const STATUS_CHIP = {proxima:'<span class="chip brass">PRÓXIMA</span>', abierta
     applyLink();
   }, e => showNote("No se pudieron cargar las evaluaciones (" + (e.code || e.message) + "). Revisa las reglas de Firestore."));
 })();
-// Conservación: hasta MAX_DAYS después del cierre; si el espacio se acerca al límite,
-// se borran primero las evaluaciones más antiguas, pero nunca antes de MIN_DAYS.
-const MAX_DAYS = 180, MIN_DAYS = 30, LIMIT_BYTES = 1e9, BUDGET_BYTES = 0.7e9;
+// Conservación: cada evaluación se guarda MAX_DAYS días después de su cierre y luego se borra.
+const MAX_DAYS = 30, MIN_DAYS = 30, LIMIT_BYTES = 1e9, BUDGET_BYTES = 0.7e9;
 const nPreg = t => { const n = t.preguntas?.length || 0; return n === 1 ? "1 pregunta" : n + " preguntas"; };
 const purgeAt = t => (t.cierre || 0) + MAX_DAYS * 864e5;
 const minAt = t => (t.cierre || 0) + MIN_DAYS * 864e5;
@@ -815,10 +814,10 @@ async function autoPurge(){
   let nAged = 0, nSpace = 0;
   for (const id of del) { try { await deleteEvaluation(id); aged.has(id) ? nAged++ : nSpace++; } catch {} }
   const msgs = [];
-  if (nAged) msgs.push(`${nAged > 1 ? `Se borraron ${nAged} evaluaciones` : "Se borró 1 evaluación"} con más de 6 meses de cerrada.`);
+  if (nAged) msgs.push(`${nAged > 1 ? `Se borraron ${nAged} evaluaciones` : "Se borró 1 evaluación"} con más de ${MAX_DAYS} días de cerrada.`);
   if (nSpace) msgs.push(`${nSpace > 1 ? `Se borraron las ${nSpace} evaluaciones más antiguas` : "Se borró la evaluación más antigua"} para liberar espacio.`);
   if (msgs.length) toast(msgs.join(" ") + " Se borraron también sus entregas y fotos.", "info");
-  if (total > BUDGET_BYTES) toast("La base de datos está casi llena y no hay evaluaciones con más de 30 días de cerradas para borrar. Elimina a mano alguna evaluación que ya no necesites.", "info");
+  if (total > BUDGET_BYTES) toast("La base de datos está casi llena. Elimina a mano alguna evaluación que ya no necesites.", "info");
 }
 const salonOf = t => cleanSalon(t?.salon) || "Sin sección";
 const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
@@ -1231,7 +1230,7 @@ $("btnPub").onclick = async () => {
 function testCard(t){ const st = statusOf(t), k = stats(new Set([t.id])); return `
       <div class="test${k.sus ? " sus" : ""}" data-id="${t.id}">
         <div class="meta"><h3>${esc(t.titulo)}</h3>
-          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se guarda hasta el ${fmtDay(purgeAt(t))}` : ""}</span></div>
+          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se borra el ${fmtDay(purgeAt(t))}` : ""}</span></div>
           <div class="who"><span>${k.entregas ? cnt(k.entregas, "entrega", "entregas") : "Sin entregas aún"}${k.pend ? ` · <b>${k.pend} por calificar</b>` : ""}${k.ina ? ` · ${cnt(k.ina, "inasistencia", "inasistencias")}` : ""}</span>${k.sus ? `<span class="chip red">${cnt(k.sus, "sospecha de IA", "sospechas de IA")}</span>` : ""}</div></div>
         <div class="actions">
           <button class="small" data-act="res" type="button">Ver entregas</button>
@@ -1295,7 +1294,7 @@ function renderTests(){
       </div>`; }).join("") : '<div class="empty">No tienes evaluaciones pendientes. Cuando tu profesor publique una, aparecerá aquí.</div>';
     $("aPast").innerHTML = myResults.length ? myResults.map(r => `
       <div class="test${r.estado === "anulada" ? " sus" : r.estado === "inasistencia" ? " ina" : ""}" data-rid="${esc(r.id)}">
-        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA · SOSPECHA DE IA</span>' : r.estado === "inasistencia" ? '<span class="chip ina">ANULADA · INASISTENCIA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "inasistencia" ? "Nota: 0" : (r.estado === "anulada" ? "Anulada " : "Entregada ") + fmtDate(r.fecha)}${r.estado !== "anulada" && r.estado !== "inasistencia" && keepUntil(r) ? ` · disponible al menos hasta el ${keepUntil(r)}` : ""}</span></div></div>
+        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA · SOSPECHA DE IA</span>' : r.estado === "inasistencia" ? '<span class="chip ina">ANULADA · INASISTENCIA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "inasistencia" ? "Nota: 0" : (r.estado === "anulada" ? "Anulada " : "Entregada ") + fmtDate(r.fecha)}${r.estado !== "anulada" && r.estado !== "inasistencia" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
         <div class="actions"><button class="small" data-act="view" type="button">Ver</button>${r.estado === "anulada" || r.estado === "en_curso" || r.estado === "inasistencia" ? "" : '<button class="ghost small" data-act="docx" type="button">Descargar Word</button>'}</div>
       </div>`).join("") : '<div class="empty">Todavía no has entregado evaluaciones.</div>';
   }
@@ -1902,7 +1901,7 @@ function showDone(r, repeated, auto){
     ? `Tu evaluación fue anulada por sospecha de uso de IA. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: puede quitar la sospecha o habilitarte para rendirla de nuevo.`
     : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
       + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Tu docente aún no asigna el puntaje (entregada el ${fmtDate(r.fecha)}).`)
-      + (keepUntil(r) ? ` Descarga tu Word cuanto antes: estará disponible al menos hasta el ${keepUntil(r)} (normalmente, hasta 6 meses después del cierre).` : "");
+      + (keepUntil(r) ? ` Descarga tu Word: estará disponible hasta el ${keepUntil(r)}.` : "");
   $("docxMsg").textContent = annulled ? "" : downloads ? "" : "La descarga no está disponible en esta vista.";
   $("btnDocx").hidden = !downloads || annulled;
   $("doneList").innerHTML = (r.preguntas||[]).map((q,i) => {
