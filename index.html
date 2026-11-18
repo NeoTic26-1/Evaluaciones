@@ -127,6 +127,17 @@ th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);whit
 th{font-size:14px;color:var(--muted);font-weight:700}
 td.num,th.num{text-align:right}
 tbody tr{cursor:pointer} tbody tr:hover td,tbody tr.sel td{background:var(--pri-soft)}
+tbody tr.sus td{background:var(--red-soft);color:var(--red)}
+tbody tr.sus:hover td,tbody tr.sus.sel td{background:#f8d6d2}
+.test.sus,.sheet.sus{border-color:var(--red);background:var(--red-soft)}
+.sheet.sus .stamp{background:var(--paper)}
+.note.bad{background:var(--red-soft)}
+.secgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.choice.sus{border-color:var(--red)}
+.choice .chip{align-self:flex-start;margin-top:4px}
+.choice .pend{color:var(--fg);font-weight:700}
+.secnav{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.secnav h3{font-size:22px}
 .empty{padding:26px 16px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:14px}
 
 /* Resultado del alumno */
@@ -364,8 +375,8 @@ input[type=datetime-local]{min-height:50px}
         <div class="row"><button id="pubCopy" type="button">Copiar enlace</button><button class="ghost" id="pubShare" type="button" hidden>Compartir</button><span></span></div>
       </div>
       <div class="sheet">
-        <div class="sheet-head"><div><h2>Mis evaluaciones</h2></div></div>
-        <div class="filters" id="salonFilter" aria-label="Filtrar por sección"></div>
+        <div class="sheet-head"><div><h2>Mis evaluaciones</h2><p class="muted" id="listHint"></p></div></div>
+        <div class="secnav" id="secNav" hidden><button class="ghost small" id="secBack" type="button">← Secciones</button><h3 id="secTitle"></h3></div>
         <div class="tests" id="tList"><div class="empty">Aún no hay evaluaciones. Créala en “Crear evaluación”.</div></div>
       </div>
 
@@ -390,7 +401,12 @@ input[type=datetime-local]{min-height:50px}
           <button class="ghost small" id="revClose" type="button">Cerrar</button></div>
         <p class="note warn" id="revNote" hidden></p>
         <ol class="qs" id="revList"></ol>
-        <div class="row" id="reopenBox" hidden><button class="ghost" id="revReopen" type="button">Permitir que rinda de nuevo</button><span></span></div>
+        <div class="row" id="reopenBox" hidden><button id="revClear" type="button">Quitar sospecha</button><button class="ghost" id="revReopen" type="button">Permitir que rinda de nuevo</button><span></span></div>
+        <div class="confirm" id="clearConfirm" hidden>
+          <span>Se quitará la sospecha de IA. La evaluación quedará como entregada, con lo que el alumno alcanzó a escribir, y podrás calificarla. ¿Continuar?</span>
+          <button class="small" id="clearYes" type="button">Sí, quitar sospecha</button>
+          <button class="ghost small" id="clearNo" type="button">Cancelar</button>
+        </div>
         <div class="confirm" id="reopenConfirm" hidden>
           <span>Se borrará este intento y el alumno podrá empezar la evaluación desde cero mientras siga abierta. ¿Continuar?</span>
           <button class="small" id="reopenYes" type="button">Sí, permitir</button>
@@ -742,7 +758,13 @@ const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
 const sameSec = (a, b) => secKey(a) === secKey(b);
 const salonName = s => s === "Sin sección" ? s : "Sección " + s;
 const cleanSalon = s => String(s || "").trim().replace(/^(sal[oó]n|secci[oó]n)\s*/i, "").replace(/\s+/g, " ").toLocaleUpperCase("es");
-let salonSel = "todos";
+let secOpen = null, allRes = [], unsubAll = null;
+const cnt = (n, s, p) => n === 1 ? "1 " + s : n + " " + p;
+function stats(ids){
+  const rs = allRes.filter(r => ids.has(r.testId));
+  return {entregas: rs.filter(r => r.estado === "entregada" || r.estado === "corregida").length,
+          pend: rs.filter(r => r.estado === "entregada").length, sus: rs.filter(r => r.estado === "anulada").length};
+}
 function salones(){ return [...new Set(tests.map(salonOf))].sort((a,b) => a.localeCompare(b, "es", {numeric:true})); }
 function fillSalones(){
   const ss = salones().filter(s => s !== "Sin sección");
@@ -840,7 +862,10 @@ function enter(){
     : `<span class="chip">N° ${session.lista}</span> ${esc(session.apellido)} · ${esc(salonName(session.salon))}`;
   $("vProfe").hidden = session.rol!=="profe";
   $("vAlumno").hidden = session.rol!=="alumno";
-  if (session.rol==="profe") { showTab(tests.length ? "tabLista" : "tabNueva"); autoPurge(); }
+  if (session.rol==="profe") {
+    secOpen = null; showTab(tests.length ? "tabLista" : "tabNueva"); autoPurge();
+    unsubAll = db.collection("resultados").onSnapshot(s => { allRes = s.docs.map(d => ({id:d.id, ...d.data()})); renderTests(); }, () => {});
+  }
   if (session.rol==="alumno") {
     showHome();
     unsubMine = db.collection("resultados").where("lista","==",session.lista).onSnapshot(s => {
@@ -860,6 +885,7 @@ function doLogout(){
   stopTimer(); session = null; current = null; revDoc = null; shown = null; myResults = [];
   if (unsubRes) { unsubRes(); unsubRes = null; }
   if (unsubMine) { unsubMine(); unsubMine = null; }
+  if (unsubAll) { unsubAll(); unsubAll = null; } allRes = [];
   ["vProfe","vAlumno","who","resBox","revBox"].forEach(id => $(id).hidden = true);
   $("vLogin").hidden = false; $("inApellido").value = ""; $("inLista").value = "";
   pickRole(null);
@@ -1119,7 +1145,7 @@ $("btnPub").onclick = async () => {
   try {
     const nuevo = {titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()};
     const ref = await db.collection("tests").add(nuevo);
-    salonSel = salon;
+    secOpen = salon;
     db.doc("config/docInfo").set({...doc, salon}).catch(()=>{});
     resetCreate();
     toast("Evaluación publicada.");
@@ -1130,10 +1156,11 @@ $("btnPub").onclick = async () => {
 };
 
 /* ---------- Listados ---------- */
-function testCard(t){ const st = statusOf(t); return `
-      <div class="test" data-id="${t.id}">
+function testCard(t){ const st = statusOf(t), k = stats(new Set([t.id])); return `
+      <div class="test${k.sus ? " sus" : ""}" data-id="${t.id}">
         <div class="meta"><h3>${esc(t.titulo)}</h3>
-          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se borra el ${fmtDay(purgeAt(t))}` : ""}</span></div></div>
+          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se borra el ${fmtDay(purgeAt(t))}` : ""}</span></div>
+          <div class="who"><span>${k.entregas ? cnt(k.entregas, "entrega", "entregas") : "Sin entregas aún"}${k.pend ? ` · <b>${k.pend} por calificar</b>` : ""}</span>${k.sus ? `<span class="chip red">${cnt(k.sus, "sospecha de IA", "sospechas de IA")}</span>` : ""}</div></div>
         <div class="actions">
           <button class="small" data-act="res" type="button">Ver entregas</button>
           <button class="ghost small" data-act="link" type="button">Copiar enlace</button>
@@ -1153,17 +1180,32 @@ function testCard(t){ const st = statusOf(t); return `
         <div class="confirm" data-confirm hidden style="flex-basis:100%"><span>¿Eliminar esta evaluación? Se borrarán también todas sus entregas, notas y fotos. Esto no se puede deshacer.</span>
           <button class="danger small" data-act="delyes" type="button" style="border-color:var(--red)">Sí, eliminar</button><button class="ghost small" data-act="delno" type="button">Cancelar</button></div>
       </div>`; }
-$("salonFilter").addEventListener("click", e => { const b = e.target.closest("[data-salon]"); if (b) { salonSel = b.dataset.salon; renderTests(); } });
+$("tList").addEventListener("click", e => {
+  const sb = e.target.closest("[data-sec]"); if (!sb) return;
+  secOpen = sb.dataset.sec; renderTests(); $("tabLista").scrollIntoView({behavior:"smooth", block:"start"});
+});
+$("secBack").onclick = () => guard(() => { closeRes(); secOpen = null; renderTests(); });
 function renderTests(){
   if (!session) return;
   if (session.rol === "profe"){
     const ss = salones();
-    if (salonSel !== "todos" && !ss.includes(salonSel)) salonSel = "todos";
-    $("salonFilter").innerHTML = ss.length > 1 ? [["todos","Todos"], ...ss.map(s => [s, salonName(s)])].map(([v,l]) =>
-      `<button type="button" class="pill" data-salon="${esc(v)}" aria-pressed="${salonSel === v}">${esc(l)}<span>${v === "todos" ? tests.length : tests.filter(t => salonOf(t) === v).length}</span></button>`).join("") : "";
-    const groups = salonSel === "todos" ? ss : [salonSel];
-    $("tList").innerHTML = tests.length ? groups.map(s => `<div class="group"><h3 class="group-title">${esc(salonName(s))}</h3>${tests.filter(t => salonOf(t) === s).map(testCard).join("")}</div>`).join("")
-      : '<div class="empty">Aún no hay evaluaciones. Créala en “Crear evaluación”.</div>';
+    if (secOpen && !ss.includes(secOpen)) secOpen = null;
+    $("secNav").hidden = !secOpen;
+    $("listHint").textContent = !secOpen && ss.length ? "Elige una sección para ver sus evaluaciones." : "";
+    if (!secOpen) {
+      $("tList").innerHTML = ss.length ? `<div class="secgrid">${ss.map(s => {
+        const ts = tests.filter(t => salonOf(t) === s), k = stats(new Set(ts.map(t => t.id))), open = ts.filter(t => statusOf(t) === "abierta").length;
+        return `<button class="choice${k.sus ? " sus" : ""}" type="button" data-sec="${esc(s)}">
+          <b>${esc(salonName(s))}</b>
+          <span>${cnt(ts.length, "evaluación", "evaluaciones")}${open ? ` · ${cnt(open, "abierta", "abiertas")}` : ""}</span>
+          <span class="${k.pend ? "pend" : ""}">${k.pend ? `${k.pend} por calificar` : k.entregas ? "Todo calificado" : "Sin entregas aún"}</span>
+          ${k.sus ? `<span class="chip red">${cnt(k.sus, "sospecha de IA", "sospechas de IA")}</span>` : ""}
+        </button>`; }).join("")}</div>`
+        : '<div class="empty">Aún no tienes secciones. Cuando crees una evaluación para una sección, aparecerá aquí.</div>';
+    } else {
+      $("secTitle").textContent = salonName(secOpen);
+      $("tList").innerHTML = tests.filter(t => salonOf(t) === secOpen).map(testCard).join("");
+    }
   } else {
     const done = new Set(myResults.map(r => r.testId));
     const list = tests.filter(t => sameSec(salonOf(t), session.salon) && statusOf(t) !== "cerrada" && !done.has(t.id)).sort((a,b) => a.inicio - b.inicio);
@@ -1173,8 +1215,8 @@ function renderTests(){
         <div class="actions">${st === "abierta" ? '<button class="small" data-act="take" type="button">Comenzar</button>' : '<button class="small" type="button" disabled>Aún no abre</button>'}</div>
       </div>`; }).join("") : '<div class="empty">No tienes evaluaciones pendientes. Cuando tu profesor publique una, aparecerá aquí.</div>';
     $("aPast").innerHTML = myResults.length ? myResults.map(r => `
-      <div class="test" data-rid="${esc(r.id)}">
-        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "anulada" ? "Anulada" : "Entregada"} ${fmtDate(r.fecha)}${r.estado !== "anulada" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
+      <div class="test${r.estado === "anulada" ? " sus" : ""}" data-rid="${esc(r.id)}">
+        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA · SOSPECHA DE IA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "anulada" ? "Anulada" : "Entregada"} ${fmtDate(r.fecha)}${r.estado !== "anulada" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
         <div class="actions"><button class="small" data-act="view" type="button">Ver</button>${r.estado === "anulada" || r.estado === "en_curso" ? "" : '<button class="ghost small" data-act="docx" type="button">Descargar Word</button>'}</div>
       </div>`).join("") : '<div class="empty">Todavía no has entregado evaluaciones.</div>';
   }
@@ -1225,7 +1267,7 @@ const pendingRows = exceptId => resRows.filter(r => r.estado === "entregada" && 
 function estadoChip(r){
   if (r.estado === "corregida") return '<span class="chip ok">CALIFICADA</span>';
   if (r.estado === "entregada") return '<span class="chip brass">POR CALIFICAR</span>';
-  if (r.estado === "anulada") return `<span class="chip red" title="${esc(r.motivo || "")}">ANULADA</span>`;
+  if (r.estado === "anulada") return `<span class="chip red" title="${esc(r.motivo || "")}">SOSPECHA DE IA</span>`;
   return resTest && Date.now() > resTest.cierre ? '<span class="chip off">NO ENTREGÓ</span>' : '<span class="chip">RINDIENDO</span>';
 }
 function nextPending(r){ const p = pendingRows(r?.id); return p.find(x => x.lista > (r?.lista ?? -1)) || p[0] || null; }
@@ -1233,7 +1275,7 @@ function renderResProgress(){
   const gradable = resRows.filter(r => r.estado === "entregada" || r.estado === "corregida");
   const n = gradable.length, g = gradable.filter(r => r.estado === "corregida").length, anul = resRows.filter(r => r.estado === "anulada").length;
   $("resProg").hidden = !n || g === n; $("resDone").hidden = !n || g !== n;
-  $("resProgText").textContent = `Calificadas ${g} de ${n}` + (anul ? ` · ${anul} anulada${anul > 1 ? "s" : ""}` : "");
+  $("resProgText").textContent = `Calificadas ${g} de ${n}` + (anul ? ` · ${cnt(anul, "con sospecha de IA", "con sospecha de IA")}` : "");
   $("resProgBar").style.width = (n ? 100*g/n : 0) + "%";
   $("resStart").hidden = !!revDoc;
   if (revDoc) $("revSave").textContent = pendingRows(revDoc.r.id).length ? "Guardar y pasar a la siguiente" : "Guardar nota";
@@ -1246,7 +1288,7 @@ function showResults(t){
   $("resBody").innerHTML = '<tr><td colspan="5" class="muted">Cargando…</td></tr>';
   unsubRes = db.collection("resultados").where("testId","==",t.id).onSnapshot(s => {
     resRows = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => a.lista - b.lista);
-    $("resBody").innerHTML = resRows.length ? resRows.map(r => `<tr data-id="${esc(r.id)}" tabindex="0" class="${revDoc?.r.id===r.id?"sel":""}">
+    $("resBody").innerHTML = resRows.length ? resRows.map(r => `<tr data-id="${esc(r.id)}" tabindex="0" class="${revDoc?.r.id===r.id?"sel":""}${r.estado==="anulada"?" sus":""}">
         <td class="num">${r.lista}</td><td>${esc(r.apellido)}</td>
         <td>${estadoChip(r)}</td>
         <td class="num">${r.estado === "corregida" ? fmt(r.puntaje) : r.estado === "anulada" ? "0" : "–"} / ${fmt(r.total)}</td><td>${fmtDate(r.fecha)}</td></tr>`).join("")
@@ -1273,10 +1315,13 @@ async function openRow(id){
     </div></li>`; }).join("");
   revTotal(); renderResProgress();
   const locked = r.estado === "anulada" || r.estado === "en_curso";
-  $("revNote").hidden = !locked;
-  if (locked) $("revNote").textContent = r.estado === "anulada"
-    ? `Evaluación anulada automáticamente. Motivo: ${r.motivo || "no registrado"} Abajo ves lo que había escrito hasta ese momento.`
-    : (resTest && Date.now() > resTest.cierre ? "El alumno empezó la evaluación pero no la entregó." : "El alumno está rindiendo la evaluación en este momento.");
+  const noteText = r.estado === "anulada"
+    ? `Sospecha de uso de IA: la evaluación se anuló automáticamente. Motivo: ${r.motivo || "no registrado"} Abajo ves lo que el alumno había escrito. Si fue un fallo del sistema, quita la sospecha para calificarla o permite que la rinda de nuevo.`
+    : r.estado === "en_curso" ? (resTest && Date.now() > resTest.cierre ? "El alumno empezó la evaluación pero no la entregó." : "El alumno está rindiendo la evaluación en este momento.")
+    : r.sospechaRetirada ? `Quitaste la sospecha de IA de esta entrega (motivo original: ${r.sospechaRetirada.motivo || "no registrado"})` : "";
+  $("revNote").hidden = !noteText; $("revNote").textContent = noteText;
+  $("revNote").className = "note " + (r.estado === "anulada" ? "bad" : "warn");
+  $("revClear").hidden = r.estado !== "anulada"; $("clearConfirm").hidden = true;
   $("revList").querySelectorAll("[data-rp]").forEach(x => x.disabled = locked);
   $("revSaveRow").hidden = locked; $("revTotalBar").hidden = locked; $("reopenBox").hidden = !locked; $("reopenConfirm").hidden = true;
   if (locked) $("revMsg").textContent = "";
@@ -1326,7 +1371,21 @@ async function saveGrade(advance){
   finally { $("revSave").disabled = false; }
 }
 $("revSave").onclick = () => saveGrade(true);
-$("revReopen").onclick = () => { $("reopenConfirm").hidden = false; };
+$("revReopen").onclick = () => { $("reopenConfirm").hidden = false; $("clearConfirm").hidden = true; };
+$("revClear").onclick = () => { $("clearConfirm").hidden = false; $("reopenConfirm").hidden = true; };
+$("clearNo").onclick = () => { $("clearConfirm").hidden = true; };
+$("clearYes").onclick = async () => {
+  const r = revDoc?.r; if (!r) return;
+  $("clearYes").disabled = true;
+  try {
+    const retiro = {motivo: r.motivo || "", fecha: Date.now()};
+    await db.doc("resultados/" + r.id).update({estado: "entregada", sospechaRetirada: retiro, puntos: null, puntaje: null});
+    Object.assign(r, {estado: "entregada", sospechaRetirada: retiro, puntos: null, puntaje: null});
+    toast(`Sospecha quitada: N° ${r.lista} · ${r.apellido}. Ya puedes calificarla.`);
+    openRow(r.id);
+  } catch (e) { $("revMsg").textContent = "No se pudo quitar la sospecha: " + e.message; $("clearConfirm").hidden = true; }
+  finally { $("clearYes").disabled = false; }
+};
 $("reopenNo").onclick = () => { $("reopenConfirm").hidden = true; };
 $("reopenYes").onclick = async () => {
   const r = revDoc?.r; if (!r) return;
@@ -1581,13 +1640,14 @@ function showDone(r, repeated, auto){
   const graded = r.estado === "corregida", annulled = r.estado === "anulada";
   $("doneScore").textContent = graded ? fmt(r.puntaje) : annulled ? "0" : "–";
   $("doneOf").textContent = `de ${fmt(r.total)} puntos`;
-  $("doneEyebrow").textContent = graded ? "CORREGIDA" : annulled ? "ANULADA" : "ENTREGADA · EN CORRECCIÓN";
+  $("doneEyebrow").textContent = graded ? "CORREGIDA" : annulled ? "ANULADA · SOSPECHA DE IA" : "ENTREGADA · EN CORRECCIÓN";
+  $("aDone").querySelector(".sheet").classList.toggle("sus", annulled);
   $("doneEyebrow").className = "chip " + (graded ? "ok" : annulled ? "red" : "brass");
   $("aDone").querySelector(".stamp").className = "stamp" + (annulled ? " bad" : "");
   $("aDone").querySelector(".stamp").style.cssText = graded || annulled ? "" : "background:var(--warn-soft);color:var(--warn)";
   $("doneTitle").textContent = r.titulo;
   $("doneSub").textContent = annulled
-    ? `Tu evaluación fue anulada. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: solo él puede habilitarte para rendirla de nuevo.`
+    ? `Tu evaluación fue anulada por sospecha de uso de IA. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: puede quitar la sospecha o habilitarte para rendirla de nuevo.`
     : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
       + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Tu docente aún no asigna el puntaje (entregada el ${fmtDate(r.fecha)}).`)
       + (keepUntil(r) ? ` Descarga tu Word: estará disponible hasta el ${keepUntil(r)}.` : "");
