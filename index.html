@@ -1,0 +1,1535 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Evaluaciones en línea</title>
+<meta name="description" content="Evaluaciones en línea: el docente crea y califica; los alumnos rinden y descargan su evaluación en Word.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233a6fd8'/%3E%3Cpath d='M18 33l9 9 19-21' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+</style>
+<style>
+/* Layout: una columna clara y aireada; pestañas simples para el docente; un solo tema claro a pedido del usuario */
+:root{
+  color-scheme:light;
+  --bg:#f5f7fb; --paper:#ffffff; --fg:#2b3442; --muted:#667085; --line:#e3e8ef; --line-strong:#cdd5e1;
+  --pri:#3a6fd8; --pri-hover:#2f60c4; --on-pri:#ffffff; --pri-soft:#eaf1fd;
+  --ok:#1f8f63; --ok-soft:#e5f6ee; --warn:#b7740c; --warn-soft:#fdf3e1; --red:#cf4438; --red-soft:#fdecea;
+  --f-head:"Lexend",system-ui,-apple-system,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:18px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--f-head);font-weight:600;text-wrap:balance;margin:0;line-height:1.2;color:var(--fg)}
+h1{font-size:clamp(28px,5vw,36px)}
+h2{font-size:24px}
+h3{font-size:20px;font-weight:500}
+p{margin:0}
+.muted{color:var(--muted)}
+.small-text{font-size:16px}
+.num{font-variant-numeric:tabular-nums}
+
+header.top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.who{font-size:17px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.sheet{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,4vw,30px);display:flex;flex-direction:column;gap:20px;min-width:0}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.sheet-head > div{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 260px}
+.view{display:flex;flex-direction:column;gap:22px}
+
+.chip{font-size:14px;font-weight:700;padding:4px 12px;border-radius:999px;background:var(--pri-soft);color:var(--pri);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.brass{background:var(--warn-soft);color:var(--warn)}
+.chip.off{background:var(--bg);color:var(--muted);border:1px solid var(--line)} .chip.red{background:var(--red-soft);color:var(--red)}
+
+button{font:inherit;font-weight:700;font-size:17px;border-radius:12px;border:1px solid var(--pri);background:var(--pri);color:var(--on-pri);padding:12px 22px;cursor:pointer;transition:background .12s}
+button:hover:not(:disabled){background:var(--pri-hover);border-color:var(--pri-hover)}
+button.ghost{background:var(--paper);color:var(--pri);border-color:var(--line-strong)}
+button.ghost:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
+button.danger{background:var(--paper);color:var(--red);border-color:var(--line-strong)}
+button.danger:hover:not(:disabled){background:var(--red-soft);border-color:var(--red)}
+button.small{padding:8px 16px;font-size:16px;border-radius:10px}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+label{font-weight:700;font-size:16px;color:var(--fg);display:flex;flex-direction:column;gap:8px}
+input,select,textarea{font:inherit;font-size:18px;color:var(--fg);background:var(--paper);border:1.5px solid var(--line-strong);border-radius:10px;padding:12px 14px;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--pri);outline:none;box-shadow:0 0 0 3px var(--pri-soft)}
+textarea{resize:vertical;line-height:1.5}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.row > *{flex:1 1 200px;min-width:0}
+.row > button{flex:0 0 auto}
+.err{color:var(--red);font-weight:700;font-size:16px}
+.note{font-size:16px;padding:14px 18px;border-radius:12px;background:var(--pri-soft);color:var(--fg)}
+.note.warn{background:var(--warn-soft)}
+
+/* Ingreso y elecciones grandes */
+#vLogin{max-width:620px;width:100%;margin:0 auto}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.choice{all:unset;box-sizing:border-box;cursor:pointer;border:2px solid var(--line);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:6px;background:var(--paper);transition:border-color .12s,background .12s}
+.choice:hover:not(:disabled){border-color:var(--pri);background:var(--paper)}
+.choice[aria-pressed="true"]:hover:not(:disabled){background:var(--pri-soft)}
+.choice:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+.choice[aria-pressed="true"]{border-color:var(--pri);background:var(--pri-soft)}
+.choice b{font-family:var(--f-head);font-weight:600;font-size:21px;color:var(--fg)}
+.choice span{color:var(--muted);font-size:16px}
+.login-form{display:flex;flex-direction:column;gap:16px}
+
+/* Pestañas del docente */
+.tabs{display:flex;gap:6px;padding:6px;background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow-x:auto}
+.tabs button{flex:1 0 auto;background:transparent;border-color:transparent;color:var(--muted);font-size:17px;padding:10px 16px}
+.tabs button:hover:not(:disabled){background:var(--bg);border-color:transparent}
+.tabs button[aria-selected="true"]{background:var(--pri-soft);color:var(--pri)}
+
+/* Subida */
+.drop{border:2px dashed var(--line-strong);border-radius:14px;padding:30px 20px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;cursor:pointer;font-weight:400;transition:background .12s,border-color .12s}
+.drop:hover,.drop.over{border-color:var(--pri);background:var(--pri-soft)}
+.drop input{display:none}
+.drop strong{font-family:var(--f-head);font-weight:500;font-size:20px}
+.panel{display:flex;flex-direction:column;gap:16px}
+details summary{cursor:pointer;font-weight:700;color:var(--pri);font-size:16px}
+details pre{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:15px;margin:10px 0 6px;padding:14px;background:var(--bg);border-radius:10px}
+.box{display:flex;flex-direction:column;gap:14px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.box h3{font-size:18px}
+details.box{display:block}
+details.box > * + *{margin-top:14px}
+
+/* Preguntas */
+ol.qs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:q}
+ol.qs > li{counter-increment:q;display:flex;flex-direction:column;gap:12px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.qbody{display:flex;flex-direction:column;gap:12px;min-width:0}
+.qbody::before{content:"Pregunta " counter(q);font-family:var(--f-head);font-size:15px;font-weight:600;color:var(--pri)}
+.qhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.qhead > :first-child{flex:1;min-width:0}
+.qtext{font-size:19px;font-weight:700;white-space:pre-wrap;overflow-wrap:anywhere}
+.pts{font-size:15px;font-weight:700;color:var(--muted);white-space:nowrap;background:var(--bg);padding:4px 10px;border-radius:8px}
+.ptsin{width:110px;flex:0 0 auto}
+.ptsin input{text-align:center}
+.check{flex-direction:row;align-items:center;gap:10px;font-weight:400;cursor:pointer}
+.check input{width:22px;height:22px;accent-color:var(--pri);flex:0 0 auto}
+.answer{min-height:130px}
+.totalbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-radius:12px;background:var(--pri-soft);font-weight:700}
+
+/* Listas */
+.tests{display:flex;flex-direction:column;gap:12px}
+.test{display:flex;gap:14px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:14px}
+.test .meta{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 260px}
+.test .actions{display:flex;gap:8px;flex-wrap:wrap}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:17px}
+th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:14px;color:var(--muted);font-weight:700}
+td.num,th.num{text-align:right}
+tbody tr{cursor:pointer} tbody tr:hover td,tbody tr.sel td{background:var(--pri-soft)}
+.empty{padding:26px 16px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:14px}
+
+/* Resultado del alumno */
+.score{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.stamp{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:120px;padding:14px 18px;border-radius:14px;background:var(--ok-soft);color:var(--ok);font-family:var(--f-head);font-weight:600;font-size:40px;line-height:1}
+.stamp small{font-family:var(--f-body);font-size:14px;font-weight:700;margin-top:6px}
+.resp{white-space:pre-wrap;padding:14px 16px;border-radius:10px;background:var(--bg);border:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
+.resp.empty-ans{color:var(--muted);font-style:italic}
+
+/* Fotos */
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.photos:empty{display:none}
+.thumb{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);aspect-ratio:1;max-width:100%;background:var(--bg)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.thumb button{position:absolute;top:6px;right:6px;padding:4px 10px;font-size:14px;background:var(--paper);color:var(--red);border-color:var(--line)}
+.addphoto{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.addphoto input{display:none}
+.btnlike{font-weight:700;font-size:16px;border-radius:10px;border:1px solid var(--line-strong);color:var(--pri);background:var(--paper);padding:8px 16px;cursor:pointer;flex-direction:row}
+.btnlike:hover{border-color:var(--pri);background:var(--pri-soft)}
+.lightbox{position:fixed;inset:0;z-index:50;background:rgba(30,38,52,.85);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;border-radius:10px;background:#fff}
+
+/* Barra inferior al rendir */
+.sticky{position:sticky;bottom:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:0 -6px 20px -12px rgba(43,52,66,.25);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.progress{flex:1 1 200px;display:flex;flex-direction:column;gap:8px;font-size:16px;color:var(--muted)}
+.bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--pri);width:0;transition:width .2s}
+.countdown{font-weight:700;color:var(--fg)}
+.countdown.late{color:var(--red)}
+.confirm{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-radius:12px;background:var(--warn-soft)}
+.confirm span{flex:1 1 220px}
+.step{font-family:var(--f-head);font-size:14px;font-weight:600;color:var(--pri);letter-spacing:.02em}
+.rules{display:flex;flex-direction:column;gap:12px;padding:18px 20px;border-radius:14px;background:var(--red-soft)}
+.rules h3{font-size:19px}
+.rulelist,.tips{margin:0;padding-left:24px;display:flex;flex-direction:column;gap:8px}
+.guard-overlay{position:fixed;inset:0;z-index:70;background:rgba(190,58,48,.94);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.guard-card{background:var(--paper);color:var(--fg);border-radius:16px;padding:26px 24px;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center;max-width:420px}
+.guard-card b{font-family:var(--f-head);font-size:24px;color:var(--red)}
+.guard-card .big{font-family:var(--f-head);font-size:48px;font-weight:600;color:var(--red);line-height:1}
+#aTake .qtext{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.stamp.bad{background:var(--red-soft);color:var(--red)}
+.toast.info{background:var(--fg);box-shadow:0 10px 30px -10px rgba(43,52,66,.5)}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
+.pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
+.pill[aria-pressed="true"],.pill[aria-pressed="true"]:hover:not(:disabled){background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+.pill span{font-weight:400;opacity:.8;margin-left:4px}
+.group{display:flex;flex-direction:column;gap:12px}
+.group + .group{margin-top:18px}
+.group-title{font-size:18px;color:var(--muted);display:flex;gap:8px;align-items:baseline}
+.progline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-radius:12px;background:var(--bg)}
+.progline .bar{flex:1 1 160px}
+.note.ok{background:var(--ok-soft)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60;max-width:calc(100% - 32px);background:var(--ok);color:#fff;font-weight:700;font-size:17px;padding:14px 22px;border-radius:12px;box-shadow:0 10px 30px -10px rgba(31,143,99,.6)}
+.sched{display:flex;flex-direction:column;gap:12px;flex-basis:100%;padding:16px;border-radius:12px;background:var(--bg)}
+input[type=datetime-local]{min-height:50px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <h1>Evaluaciones en línea</h1>
+    <div class="who" id="who" hidden>
+      <span id="whoText"></span>
+      <button class="ghost small" id="logout" type="button">Salir</button>
+    </div>
+  </header>
+
+  <div class="note warn" id="dbNote" hidden></div>
+
+  <!-- INGRESO -->
+  <section class="sheet" id="vLogin">
+    <div class="sheet-head"><div>
+      <h2>¿Quién eres?</h2>
+      <p class="muted">Elige una opción para entrar.</p>
+    </div></div>
+    <div class="choices">
+      <button class="choice" id="rAlumno" aria-pressed="false" type="button">
+        <b>Soy alumno</b>
+        <span>Entro con mi número de lista y mi apellido.</span>
+      </button>
+      <button class="choice" id="rProfe" aria-pressed="false" type="button">
+        <b>Soy docente</b>
+        <span>Entro con la clave para crear y corregir evaluaciones.</span>
+      </button>
+    </div>
+    <form id="fAlumno" class="login-form" hidden>
+      <div class="row">
+        <label style="flex:0 1 150px">N° de lista<input id="inLista" type="number" min="1" max="99" inputmode="numeric" required placeholder="14"></label>
+        <label>Apellido paterno<input id="inApellido" type="text" required autocomplete="family-name" placeholder="González"></label>
+        <label style="flex:0 1 150px">Sección<input id="inSalonA" type="text" required list="salonList" autocomplete="off" placeholder="A"></label>
+      </div>
+      <button type="submit" style="align-self:flex-start">Entrar</button>
+    </form>
+    <form id="fProfe" class="login-form" hidden>
+      <label>Clave del docente<input id="inClave" type="password" required autocomplete="current-password"></label>
+      <button type="submit" style="align-self:flex-start">Entrar</button>
+    </form>
+    <p class="err" id="loginErr" hidden></p>
+  </section>
+
+  <!-- DOCENTE -->
+  <section class="view" id="vProfe" hidden>
+    <nav class="tabs" role="tablist" aria-label="Secciones del docente">
+      <button type="button" role="tab" data-tab="tabNueva" aria-selected="true">Crear evaluación</button>
+      <button type="button" role="tab" data-tab="tabLista" aria-selected="false">Mis evaluaciones</button>
+      <button type="button" role="tab" data-tab="tabClave" aria-selected="false">Clave</button>
+    </nav>
+
+    <div class="view" id="tabNueva">
+      <div class="sheet" id="step1">
+        <div class="sheet-head"><div>
+          <span class="step">Paso 1 de 2</span>
+          <h2>Datos de la evaluación</h2>
+          <p class="muted">Estos datos aparecen en el documento Word que descarga cada alumno.</p>
+        </div></div>
+        <div class="row">
+          <label>Título<input id="inTitulo" type="text" placeholder="Ej: Laboratorio de densidad"></label>
+          <label style="flex:0 1 200px">Sección<input id="inSalon" type="text" list="salonList" placeholder="Ej: A"></label>
+        </div>
+        <datalist id="salonList"></datalist>
+        <div class="box">
+          <h3>Duración: ¿cuándo la rinden?</h3>
+          <div class="row">
+            <label>Empieza<input id="inInicio" type="datetime-local"></label>
+            <label>Termina<input id="inCierre" type="datetime-local"></label>
+          </div>
+          <p class="muted small-text" id="durText"></p>
+          <div class="filters" id="durQuick" aria-label="Duración rápida">
+            <button type="button" class="pill" data-min="15">15 min</button><button type="button" class="pill" data-min="30">30 min</button>
+            <button type="button" class="pill" data-min="45">45 min</button><button type="button" class="pill" data-min="60">1 hora</button><button type="button" class="pill" data-min="90">1 h 30 min</button>
+          </div>
+        </div>
+        <div class="box">
+          <h3>Datos del curso</h3>
+          <div class="row">
+            <label>Curso<input id="inCurso" type="text" placeholder="FISICA I"></label>
+            <label style="flex:0 1 170px">Código<input id="inCodigo" type="text" placeholder="BFI 01 B/ F"></label>
+          </div>
+          <div class="row">
+            <label>Docente<input id="inDocente" type="text" placeholder="Mag. Nombre Apellido"></label>
+            <label style="flex:0 1 170px">Ciclo<input id="inCiclo" type="text" placeholder="26 2"></label>
+          </div>
+        </div>
+        <p class="err" id="step1Err" hidden></p>
+        <button id="btnStep1" type="button" style="align-self:flex-start">Continuar a las preguntas</button>
+      </div>
+
+      <div class="sheet" id="step1Sum" hidden>
+        <div class="sheet-head"><div>
+          <span class="step">Paso 1 de 2 · listo</span>
+          <h3 id="sumTitle"></h3>
+          <p class="muted small-text" id="sumText"></p>
+        </div>
+        <button class="ghost small" id="btnEditStep1" type="button">Editar datos</button></div>
+      </div>
+
+      <div class="sheet" id="startBox" hidden>
+        <div class="sheet-head"><div>
+          <span class="step">Paso 2 de 2</span>
+          <h2>Preguntas</h2>
+          <p class="muted">¿Cómo quieres armar las preguntas?</p>
+        </div></div>
+        <div class="choices">
+          <button class="choice" id="chWord" aria-pressed="false" type="button">
+            <b>Desde un Word</b>
+            <span>Subo un .docx que ya tiene las preguntas numeradas.</span>
+          </button>
+          <button class="choice" id="chManual" aria-pressed="false" type="button">
+            <b>Escribirlas yo</b>
+            <span>Redacto mis propias preguntas desde cero.</span>
+          </button>
+        </div>
+        <div id="wordBox" class="panel" hidden>
+          <label class="drop" id="drop" for="file">
+            <input type="file" id="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <strong>Arrastra el archivo aquí o haz clic</strong>
+            <span class="muted" id="fileName">Solo archivos .docx</span>
+          </label>
+          <div id="genOpts" class="panel" hidden>
+            <div class="row">
+              <label hidden>¿Qué hacer con el documento?
+                <select id="inModo">
+                  <option value="doc">Usar las preguntas que ya trae el documento</option>
+                </select>
+              </label>
+              <label style="flex:0 1 150px">N° de preguntas<input id="inCant" type="number" min="1" max="30" value="6"></label>
+            </div>
+            <button id="btnGen" type="button" style="align-self:flex-start">Crear preguntas</button>
+            <details>
+              <summary>¿Cómo deben estar escritas las preguntas en el Word?</summary>
+              <pre>1.- Explica el principio de Arquímedes.
+2.- Calcula la densidad de un cubo de 2 cm de lado y 64 g de masa.</pre>
+              <p class="muted small-text">Cada pregunta empieza con su número.</p>
+            </details>
+            <p class="muted" id="genStatus" aria-live="polite"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet" id="editor" hidden>
+        <div class="sheet-head"><div>
+          <h2>Tus preguntas</h2>
+          <p class="muted">Escribe o corrige cada pregunta y ponle su puntaje (puedes usar decimales, como 1,5).</p>
+        </div></div>
+        <ol class="qs" id="edList"></ol>
+        <button class="ghost" id="btnAddQ" type="button" style="align-self:flex-start">+ Agregar pregunta</button>
+        <div class="totalbar"><span id="edCount"></span><span>Total: <span class="num" id="edTotal"></span></span></div>
+        <details class="box">
+          <summary>Poner el mismo puntaje a todas las preguntas</summary>
+          <div class="row">
+            <label style="flex:0 1 200px">Puntaje<input id="inPtsAll" type="text" inputmode="decimal" value="2"></label>
+            <button class="ghost" id="btnPtsAll" type="button">Aplicar a todas</button>
+          </div>
+        </details>
+        <div class="row">
+          <button id="btnPub" type="button">Publicar evaluación</button>
+          <button class="ghost" id="btnDiscard" type="button">Descartar</button>
+        </div>
+        <p class="err" id="pubErr" hidden></p>
+      </div>
+    </div>
+
+    <div class="view" id="tabLista" hidden>
+      <div class="sheet">
+        <div class="sheet-head"><div><h2>Mis evaluaciones</h2></div></div>
+        <div class="filters" id="salonFilter" aria-label="Filtrar por sección"></div>
+        <div class="tests" id="tList"><div class="empty">Aún no hay evaluaciones. Créala en “Crear evaluación”.</div></div>
+      </div>
+
+      <div class="sheet" id="resBox" hidden>
+        <div class="sheet-head"><div><h2 id="resTitle"></h2>
+          <p class="muted">Toca un alumno para leer sus respuestas y ponerle nota.</p></div>
+          <button class="ghost small" id="resClose" type="button">Cerrar</button></div>
+        <div class="progline" id="resProg" hidden>
+          <span id="resProgText"></span><div class="bar"><i id="resProgBar"></i></div>
+          <button class="small" id="resStart" type="button">Calificar pendientes</button>
+        </div>
+        <p class="note ok" id="resDone" hidden>¡Listo! Calificaste todas las entregas de esta evaluación.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th class="num">N°</th><th>Apellido</th><th>Estado</th><th class="num">Puntaje</th><th>Entregó</th></tr></thead>
+          <tbody id="resBody"></tbody>
+        </table></div>
+      </div>
+
+      <div class="sheet" id="revBox" hidden>
+        <div class="sheet-head"><div><h2 id="revTitle"></h2>
+          <p class="muted">Escribe los puntos de cada pregunta, entre 0 y su máximo. Puedes usar decimales.</p></div>
+          <button class="ghost small" id="revClose" type="button">Cerrar</button></div>
+        <p class="note warn" id="revNote" hidden></p>
+        <ol class="qs" id="revList"></ol>
+        <div class="row" id="reopenBox" hidden><button class="ghost" id="revReopen" type="button">Permitir que rinda de nuevo</button><span></span></div>
+        <div class="confirm" id="reopenConfirm" hidden>
+          <span>Se borrará este intento y el alumno podrá empezar la evaluación desde cero mientras siga abierta. ¿Continuar?</span>
+          <button class="small" id="reopenYes" type="button">Sí, permitir</button>
+          <button class="ghost small" id="reopenNo" type="button">Cancelar</button>
+        </div>
+        <div class="totalbar" id="revTotalBar"><span>Nota del alumno</span><span class="num" id="revTotal"></span></div>
+        <div class="confirm" id="revGuard" hidden>
+          <span id="revGuardText"></span>
+          <button class="small" id="revGuardSave" type="button">Guardar cambios</button>
+          <button class="ghost small" id="revGuardDrop" type="button">No guardar</button>
+          <button class="ghost small" id="revGuardBack" type="button">Seguir calificando</button>
+        </div>
+        <div class="row" id="revSaveRow" style="align-items:center"><button id="revSave" type="button" style="flex:0 0 auto">Guardar nota</button><span class="muted" id="revMsg" aria-live="polite"></span></div>
+      </div>
+    </div>
+
+    <div class="view" id="tabClave" hidden>
+      <div class="sheet">
+        <div class="sheet-head"><div><h2>Cambiar clave</h2><p class="muted">La nueva clave reemplaza a la actual para entrar como docente.</p></div></div>
+        <form class="row" id="fClave">
+          <label>Nueva clave<input id="inNueva" type="password" minlength="4" required autocomplete="new-password"></label>
+          <button type="submit">Guardar clave</button>
+        </form>
+        <p class="muted" id="claveMsg"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALUMNO -->
+  <section class="view" id="vAlumno" hidden>
+    <div id="aHome" class="view">
+      <div class="sheet">
+        <div class="sheet-head"><div><h2>Por rendir</h2></div></div>
+        <div class="tests" id="aTests"></div>
+      </div>
+      <div class="sheet">
+        <div class="sheet-head"><div><h2>Mis evaluaciones anteriores</h2></div></div>
+        <div class="tests" id="aPast"></div>
+      </div>
+    </div>
+
+    <div class="view" id="aWarn" hidden>
+      <div class="sheet">
+        <div class="sheet-head"><div><span class="step">Antes de empezar</span><h2 id="warnTitle"></h2><p class="muted" id="warnSub"></p></div></div>
+        <div class="rules">
+          <h3>Tu evaluación se anulará automáticamente si:</h3>
+          <ol class="rulelist">
+            <li><b>Cambias de pestaña</b> o abres otra aplicación.</li>
+            <li><b>Minimizas el navegador</b> o vas a la pantalla de inicio del celular.</li>
+            <li><b>Sales de la ventana</b> de la evaluación (haces clic en otra ventana o programa) y no regresas en 3 segundos.</li>
+            <li><b>Se bloquea o se apaga la pantalla</b> del celular, o contestas una llamada.</li>
+            <li><b>Se inserta de golpe un texto largo</b> en tus respuestas (por ejemplo, desde el portapapeles del teclado del celular o un dictado muy largo).</li>
+            <li><b>Copias o cortas texto</b>, incluso de tus propias respuestas.</li>
+            <li><b>Arrastras</b> texto o archivos hacia la evaluación.</li>
+            <li><b>Intentas abrir las herramientas del navegador</b> (F12 o Ctrl+Shift+I).</li>
+            <li><b>Cierras o recargas la página</b>, o sales sin entregar.</li>
+          </ol>
+          <p>Todo esto se considera <b>sospecha de uso de inteligencia artificial</b> u otra ayuda externa. Una evaluación anulada no se puede continuar. Solo tu docente puede habilitarte para rendirla de nuevo.</p>
+        </div>
+        <div class="box">
+          <h3>Lo que sí puedes hacer</h3>
+          <p>Subir fotos de tu desarrollo con los botones <b>Tomar foto</b> o <b>Elegir de la galería</b> (en computadora, <b>Subir fotos</b>). Mientras tomas o eliges la foto, la evaluación no se anula, pero debes volver en menos de <b>3 minutos</b>.</p>
+        </div>
+        <div class="box">
+          <h3>Antes de tocar “Empezar”</h3>
+          <ul class="tips">
+            <li>Activa el modo <b>No molestar</b> (o modo avión con Wi-Fi) para no recibir llamadas ni notificaciones.</li>
+            <li>La función de <b>pegar (Ctrl+V) está desactivada</b>: escribe todo con tu teclado.</li>
+            <li>Cierra las demás aplicaciones y pestañas.</li>
+            <li>Revisa que tengas batería y buena conexión a internet.</li>
+            <li>Si la pantalla de tu celular se apaga sola muy rápido, aumenta el tiempo de apagado automático.</li>
+          </ul>
+        </div>
+        <label class="check"><input type="checkbox" id="warnOk"> Leí estas reglas y acepto que mi evaluación se anule si incumplo alguna.</label>
+        <p class="err" id="warnErr" hidden></p>
+        <div class="row"><button id="btnStart" type="button" disabled>Empezar evaluación</button><button class="ghost" id="warnBack" type="button">Volver</button></div>
+      </div>
+    </div>
+
+    <div class="view" id="aTake" hidden>
+      <div class="sheet">
+        <div class="sheet-head"><div><h2 id="takeTitle"></h2><p class="muted" id="takeSub"></p></div></div>
+        <p class="note">Responde con tus palabras y explica cómo llegaste a tu respuesta. En las preguntas de cálculo puedes subir fotos de tu hoja. No salgas de esta pantalla hasta entregar.</p>
+      </div>
+      <form id="fTake" style="display:flex;flex-direction:column;gap:14px">
+        <ol class="qs" id="takeList"></ol>
+        <p class="err" id="takeErr" hidden></p>
+        <div class="confirm" id="takeConfirm" hidden>
+          <span id="takeConfirmText"></span>
+          <button class="small" id="takeConfirmYes" type="button">Entregar así</button>
+          <button class="ghost small" id="takeConfirmNo" type="button">Seguir respondiendo</button>
+        </div>
+        <div class="sticky">
+          <div class="progress"><span><span id="progText"></span> · <span class="countdown" id="countdown"></span></span><div class="bar"><i id="progBar"></i></div></div>
+          <button type="submit" id="btnSubmit">Entregar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="view" id="aDone" hidden>
+      <div class="sheet">
+        <div class="score">
+          <div class="stamp"><span id="doneScore"></span><small id="doneOf"></small></div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 220px"><span class="chip" id="doneEyebrow" style="align-self:flex-start"></span><h2 id="doneTitle"></h2><p class="muted" id="doneSub"></p></div>
+        </div>
+        <div class="row" style="align-items:center">
+          <button id="btnDocx" type="button" style="flex:0 0 auto">Descargar en Word</button>
+          <button class="ghost" id="doneBack" type="button" style="flex:0 0 auto">Volver</button>
+          <span class="muted" id="docxMsg" aria-live="polite"></span>
+        </div>
+      </div>
+      <ol class="qs" id="doneList"></ol>
+    </div>
+  </section>
+</div>
+
+<div class="guard-overlay" id="blurOverlay" hidden>
+  <div class="guard-card">
+    <b>¡Vuelve a la evaluación!</b>
+    <span class="big" id="blurCount">3</span>
+    <span>Saliste de la ventana. Si no regresas, tu evaluación se anulará.</span>
+    <button type="button" id="blurBack">Volver a la evaluación</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="lightbox" id="lightbox" hidden><img id="lightImg" alt="Foto ampliada"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* ---------- Documento Word (formato del departamento) ---------- */
+const DocxBuilder = (() => {
+  const x = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const CYAN = "00B0F0";
+  function run(text, o = {}){
+    const p = [];
+    if (o.b) p.push("<w:b/><w:bCs/>");
+    if (o.color) p.push(`<w:color w:val="${o.color}"/>`);
+    if (o.sz) p.push(`<w:sz w:val="${o.sz}"/><w:szCs w:val="${o.sz}"/>`);
+    const parts = String(text ?? "").split("\n").map(t => `<w:t xml:space="preserve">${x(t)}</w:t>`).join("<w:br/>");
+    return `<w:r>${p.length ? `<w:rPr>${p.join("")}</w:rPr>` : ""}${parts}</w:r>`;
+  }
+  function para(runs, o = {}){
+    const p = [];
+    if (o.keep) p.push("<w:keepNext/>");
+    p.push(`<w:spacing w:before="${o.before ?? 0}" w:after="${o.after ?? 0}"/>`);
+    if (o.ind) p.push(`<w:ind w:left="${o.ind}" w:hanging="${o.ind}"/>`);
+    if (o.jc) p.push(`<w:jc w:val="${o.jc}"/>`);
+    return `<w:p><w:pPr>${p.join("")}</w:pPr>${Array.isArray(runs) ? runs.join("") : runs}</w:p>`;
+  }
+  function cell(content, w, o = {}){
+    const p = [`<w:tcW w:w="${w}" w:type="dxa"/>`];
+    if (o.span) p.push(`<w:gridSpan w:val="${o.span}"/>`);
+    if (o.shade) p.push(`<w:shd w:val="clear" w:color="auto" w:fill="${o.shade}"/>`);
+    p.push(`<w:vAlign w:val="${o.v || "center"}"/>`);
+    return `<w:tc><w:tcPr>${p.join("")}</w:tcPr>${Array.isArray(content) ? content.join("") : content}</w:tc>`;
+  }
+  function table(rows, widths, o = {}){
+    const b = o.noBorders ? "nil" : "single";
+    const borders = ["top","left","bottom","right","insideH","insideV"].map(s => `<w:${s} w:val="${b}" w:sz="4" w:space="0" w:color="000000"/>`).join("");
+    const total = widths.reduce((a,c) => a + c, 0);
+    return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>${o.center ? '<w:jc w:val="center"/>' : ""}<w:tblBorders>${borders}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="70" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar></w:tblPr>`
+      + `<w:tblGrid>${widths.map(w => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>`
+      + rows.map(r => `<w:tr>${o.cantSplit ? "<w:trPr><w:cantSplit/></w:trPr>" : ""}${r.join("")}</w:tr>`).join("") + "</w:tbl>";
+  }
+  const image = (rid = "rIdImg", id = 1, cx = 469265, cy = 628650) => `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Imagen ${id}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="img${id}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+
+  function documentXml({info, titulo, lista, apellido, preguntas, respuestas, fotos, puntos, total, puntaje, entregado, fmt}){
+    const L = "abcdefghij", body = [];
+    // Encabezado: escudo + nombre de la universidad
+    body.push(table([[
+      cell(para(image()), 1000),
+      cell([
+        para(run("UNIVERSIDAD NACIONAL DE INGENIERÍA", {b:true, sz:28}), {jc:"center"}),
+        para(run("Facultad de Ingeniería Industrial y de Sistemas", {b:true, sz:24}), {jc:"center"}),
+        para(run("DEPARTAMENTO DE CIENCIAS BÁSICAS", {b:true, sz:20}), {jc:"center"})
+      ], 6504)
+    ]], [1000, 6504], {noBorders:true, center:true}));
+    body.push(para("", {after:200}));
+    // Datos del curso
+    const lab = t => para(run(t, {b:true, sz:18}));
+    const val = t => para(run(t, {b:true, sz:18}));
+    body.push(table([
+      [cell(lab("Curso"),1300), cell(val(info.curso),3900), cell(lab("Ciclo"),1100), cell(val(info.ciclo),1204)],
+      [cell(lab("Código"),1300), cell(val(info.codigo),3900), cell(lab(""),1100), cell(val(""),1204)],
+      [cell(lab("Docente"),1300), cell(val(info.docente),3900), cell(lab("Fecha"),1100), cell(val(info.fecha),1204)]
+    ], [1300,3900,1100,1204], {center:true}));
+    // Título
+    body.push(para([run("Evaluación: ", {b:true, sz:28}), run(titulo, {b:true, sz:28, color:CYAN})], {jc:"center", before:240, after:60}));
+    // Alumno
+    body.push(table([
+      [cell(para(run("# lista", {sz:16})), 900), cell(para(run("Apellido paterno", {sz:16})), 2800)],
+      [cell(para(run(String(lista), {sz:20})), 900), cell(para(run(apellido, {sz:20})), 2800)]
+    ], [900, 2800]));
+    body.push(para("", {after:200}));
+    // Preguntas
+    const media = [];
+    preguntas.forEach((q, i) => {
+      const resp = String(respuestas?.[i] ?? "").trim() || "Sin respuesta escrita.";
+      const asg = puntos ? fmt(puntos[i] ?? 0) : "Pendiente";
+      body.push(para([run(`${i+1}.-\t`), run(q.pregunta)], {before:200, after:120, ind:567, keep:true}));
+      body.push(table([
+        [cell(para(run("Respuesta del alumno", {b:true, color:CYAN}), {jc:"center"}), 4300),
+         cell(para(run("Puntaje de la pregunta", {b:true}), {jc:"center"}), 1600),
+         cell(para(run("Puntaje asignado", {b:true}), {jc:"center"}), 1604)],
+        [cell(resp.split(/\n+/).map(t => para(run(t), {after:60})), 4300, {v:"top"}),
+         cell(para(run(fmt(q.puntos ?? 1)), {jc:"center"}), 1600),
+         cell(para(run(asg, {b:true}), {jc:"center"}), 1604)]
+      ], [4300,1600,1604]));
+      const fs = fotos?.[i] || [];
+      if (fs.length) {
+        body.push(para(run(`Evidencias del desarrollo (${fs.length} foto${fs.length>1?"s":""})`, {sz:16, color:"595959"}), {before:100, after:60, keep:true}));
+        fs.forEach(f => {
+          const n = media.length + 1, maxW = 4114800, cx = Math.min(maxW, Math.round(f.w * 9525)), cy = Math.round(cx * f.h / f.w);
+          const lim = 6400800, k = cy > lim ? lim / cy : 1;
+          media.push(f.data);
+          body.push(para(image(`rIdF${n}`, n + 1, Math.round(cx*k), Math.round(cy*k)), {after:80}));
+        });
+      }
+    });
+    // Total
+    const pct = puntos && total ? Math.round(100*puntaje/total) + "%" : "Pendiente";
+    body.push(para(run("Resultado final", {b:true}), {before:360, after:120, keep:true}));
+    body.push(table([
+      [cell(para(run("Puntaje obtenido", {b:true, color:CYAN}), {jc:"center"}), 2500), cell(para(run("Puntaje máximo", {b:true}), {jc:"center"}), 2500), cell(para(run("Porcentaje", {b:true}), {jc:"center"}), 2504)],
+      [cell(para(run(puntos ? fmt(puntaje) : "Pendiente", {b:true, sz:24}), {jc:"center"}), 2500), cell(para(run(fmt(total), {sz:24}), {jc:"center"}), 2500), cell(para(run(pct, {sz:24}), {jc:"center"}), 2504)]
+    ], [2500,2500,2504], {cantSplit:true}));
+    body.push(para(run(puntos ? "Evaluación corregida por el docente." : "Evaluación entregada; el docente aún no asigna el puntaje.", {sz:16, color:"595959"}), {before:80}));
+    if (entregado) body.push(para(run("Entregada: " + entregado, {sz:16, color:"595959"})));
+
+    return {media, xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join("")}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`};
+  }
+  const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:lang w:val="es-PE"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;
+  const TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
+  const RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const IMG = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+  const DOC_RELS = n => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdImg" Type="${IMG}" Target="media/escudo.jpeg"/>${Array.from({length:n},(_,i)=>`<Relationship Id="rIdF${i+1}" Type="${IMG}" Target="media/f${i+1}.jpeg"/>`).join("")}</Relationships>`;
+
+  async function build(JSZipLib, crestBase64, data){
+    const zip = new JSZipLib();
+    zip.file("[Content_Types].xml", TYPES);
+    zip.file("_rels/.rels", RELS);
+    const doc = documentXml(data);
+    zip.file("word/_rels/document.xml.rels", DOC_RELS(doc.media.length));
+    doc.media.forEach((b64, i) => zip.file(`word/media/f${i+1}.jpeg`, b64, {base64:true}));
+    zip.file("word/styles.xml", STYLES);
+    zip.file("word/media/escudo.jpeg", crestBase64, {base64:true});
+    zip.file("word/document.xml", doc.xml);
+    return zip.generateAsync({type:"uint8array", compression:"DEFLATE"});
+  }
+  return {build};
+})();
+
+
+const CREST = "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";
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const DEFAULT_CLAVE = "12345";
+const MAX_FOTOS = 4;
+let db = null, sample = null, downloads = null;
+let session = null;
+let tests = [];
+let myResults = [];
+let unsubRes = null, unsubMine = null;
+let draft = [];
+let docText = "";
+let current = null;          // evaluación que rinde el alumno
+let takeFotos = [];          // [[{data,w,h}]] fotos por pregunta
+let timer = null, submitting = false;
+let resRows = [];
+let revDoc = null;
+let shown = null;            // resultado mostrado en aDone
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function sha(s){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+const fmtDate = t => t ? new Date(t).toLocaleString("es-PE",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+const fmtDay = t => new Date(t).toLocaleDateString("es-PE",{day:"2-digit",month:"2-digit",year:"2-digit"});
+const fmtHour = t => new Date(t).toLocaleTimeString("es-PE",{hour:"2-digit",minute:"2-digit"});
+const toLocalInput = ms => { const d = new Date(ms - new Date(ms).getTimezoneOffset()*60000); return d.toISOString().slice(0,16); };
+const norm = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").trim().toLowerCase();
+const r2 = n => Math.round(n*100)/100;
+const fmt = n => r2(Number(n)||0).toLocaleString("es-PE",{maximumFractionDigits:2});
+const inFmt = n => String(r2(Number(n)||0)).replace(".", ",");
+function parseNum(s){ const n = parseFloat(String(s).trim().replace(",", ".")); return Number.isFinite(n) && n >= 0 ? r2(n) : null; }
+const ptsOf = q => (typeof q.puntos === "number" ? q.puntos : 1);
+const totalOf = t => r2((t.preguntas||[]).reduce((s,q) => s + ptsOf(q), 0));
+const plural = (n, w) => `${fmt(n)} ${w}${n === 1 ? "" : "s"}`;
+const statusOf = t => { const now = Date.now(); return now < t.inicio ? "proxima" : now >= t.cierre ? "cerrada" : "abierta"; };
+const windowText = t => fmtDay(t.inicio) === fmtDay(t.cierre) ? `${fmtDay(t.inicio)}, de ${fmtHour(t.inicio)} a ${fmtHour(t.cierre)}` : `del ${fmtDate(t.inicio)} al ${fmtDate(t.cierre)}`;
+const STATUS_CHIP = {proxima:'<span class="chip brass">PRÓXIMA</span>', abierta:'<span class="chip ok">ABIERTA</span>', cerrada:'<span class="chip off">CERRADA</span>'};
+
+/* ---------- Conexión (Firebase) ---------- */
+(async () => {
+  const cfg = window.FIREBASE_CONFIG || {};
+  if (!window.firebase) { showNote("No se pudo cargar la base de datos. Revisa tu conexión a internet y vuelve a cargar la página."); return; }
+  if (!cfg.apiKey || !cfg.projectId) { showNote("Falta configurar la base de datos: completa el archivo firebase-config.js con los datos de tu proyecto de Firebase."); return; }
+  try {
+    firebase.initializeApp(cfg);
+    const fs = firebase.firestore();
+    fs.settings({ignoreUndefinedProperties: true, merge: true});
+    db = fs;
+  } catch (e) { showNote("No se pudo iniciar la base de datos: " + e.message); return; }
+  sample = null;
+  downloads = { save: async ({filename, data}) => {
+    const blob = new Blob([data], {type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  } };
+  $("dbNote").hidden = true;
+  db.collection("tests").onSnapshot(s => {
+    tests = s.docs.map(d => ({id:d.id, ...d.data()})).filter(t => t.inicio && t.cierre).sort((a,b)=>(b.inicio||0)-(a.inicio||0));
+    fillSalones();
+    renderTests();
+  }, e => showNote("No se pudieron cargar las evaluaciones (" + (e.code || e.message) + "). Revisa las reglas de Firestore."));
+})();
+const salonOf = t => String(t?.salon || "").trim() || "Sin sección";
+const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
+const sameSec = (a, b) => secKey(a) === secKey(b);
+const salonName = s => s === "Sin sección" ? s : "Sección " + s;
+const cleanSalon = s => String(s || "").trim().replace(/^(sal[oó]n|secci[oó]n)\s*/i, "");
+let salonSel = "todos";
+function salones(){ return [...new Set(tests.map(salonOf))].sort((a,b) => a.localeCompare(b, "es", {numeric:true})); }
+function fillSalones(){
+  const ss = salones().filter(s => s !== "Sin sección");
+  $("salonList").innerHTML = ss.map(s => `<option value="${esc(s)}"></option>`).join("");
+}
+let toastT = null;
+function toast(msg, kind){ const t = $("toast"); t.textContent = msg; t.className = "toast" + (kind ? " " + kind : ""); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 4000); }
+function showNote(m){ $("dbNote").textContent = m; $("dbNote").hidden = false; }
+setInterval(() => { if (session && !current) renderTests(); }, 30000);
+
+/* ---------- Ingreso ---------- */
+function pickRole(r){
+  $("rAlumno").setAttribute("aria-pressed", r==="alumno");
+  $("rProfe").setAttribute("aria-pressed", r==="profe");
+  $("fAlumno").hidden = r!=="alumno"; $("fProfe").hidden = r!=="profe"; $("loginErr").hidden = true;
+  if (r) (r==="alumno" ? $("inLista") : $("inClave")).focus();
+}
+$("rAlumno").onclick = () => pickRole("alumno");
+$("rProfe").onclick = () => pickRole("profe");
+function loginErr(m){ $("loginErr").textContent = m; $("loginErr").hidden = false; }
+
+$("fAlumno").onsubmit = e => {
+  e.preventDefault();
+  const lista = parseInt($("inLista").value,10), apellido = $("inApellido").value.trim();
+  if (!lista || lista < 1) return loginErr("Escribe tu número de lista (un número desde 1).");
+  if (apellido.length < 2) return loginErr("Escribe tu apellido paterno.");
+  const typed = cleanSalon($("inSalonA").value);
+  if (!typed) return loginErr("Escribe tu sección.");
+  const salon = salones().find(s => sameSec(s, typed)) || typed;
+  if (!db) return loginErr("Sin conexión a la base de datos. Revisa tu internet y vuelve a cargar la página.");
+  session = {rol:"alumno", lista, apellido, salon};
+  enter();
+};
+$("fProfe").onsubmit = async e => {
+  e.preventDefault();
+  const h = await sha($("inClave").value);
+  let stored = await sha(DEFAULT_CLAVE);
+  if (db) { try { const c = await db.doc("config/main").get(); if (c.exists && c.data().claveHash) stored = c.data().claveHash; } catch {} }
+  if (h !== stored) return loginErr("Clave incorrecta. Inténtalo de nuevo.");
+  $("inClave").value = "";
+  session = {rol:"profe"};
+  enter();
+};
+function enter(){
+  $("vLogin").hidden = true;
+  $("who").hidden = false;
+  $("whoText").innerHTML = session.rol==="profe"
+    ? '<span class="chip">DOCENTE</span>'
+    : `<span class="chip">N° ${session.lista}</span> ${esc(session.apellido)} · ${esc(salonName(session.salon))}`;
+  $("vProfe").hidden = session.rol!=="profe";
+  $("vAlumno").hidden = session.rol!=="alumno";
+  if (session.rol==="profe") showTab(tests.length ? "tabLista" : "tabNueva");
+  if (session.rol==="alumno") {
+    showHome();
+    unsubMine = db.collection("resultados").where("lista","==",session.lista).onSnapshot(s => {
+      myResults = s.docs.map(d => ({id:d.id, ...d.data()})).filter(r => norm(r.apellido) === norm(session.apellido) && (!r.salon || sameSec(r.salon, session.salon))).sort((a,b) => b.fecha - a.fecha);
+      myResults.filter(r => r.estado === "en_curso" && r.testId !== current?.id && !fixing.has(r.id)).forEach(r => { fixing.add(r.id); markAnnulled(r.id, storedMotivo(r.id) || ABANDON); });
+      renderTests();
+      if (shown) { const upd = myResults.find(r => r.id === shown.id); if (upd) showDone(upd, false); }
+    }, () => {});
+  } else loadDocDefaults();
+  renderTests();
+}
+$("logout").onclick = () => guard(doLogout);
+function doLogout(){
+  revDirty = false; guardAction = null;
+  stopTimer(); session = null; current = null; revDoc = null; shown = null; myResults = [];
+  if (unsubRes) { unsubRes(); unsubRes = null; }
+  if (unsubMine) { unsubMine(); unsubMine = null; }
+  ["vProfe","vAlumno","who","resBox","revBox"].forEach(id => $(id).hidden = true);
+  $("vLogin").hidden = false; $("inApellido").value = ""; $("inLista").value = "";
+  pickRole(null);
+};
+
+/* ---------- Pestañas y forma de crear ---------- */
+function showTab(id){
+  document.querySelectorAll(".tabs [data-tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === id));
+  ["tabNueva","tabLista","tabClave"].forEach(t => $(t).hidden = t !== id);
+  window.scrollTo({top:0});
+}
+document.querySelector(".tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) guard(() => showTab(b.dataset.tab)); });
+/* Paso 1: datos */
+function defaultTimes(){
+  const start = new Date(); start.setSeconds(0, 0);
+  $("inInicio").value = toLocalInput(+start);
+  $("inCierre").value = toLocalInput(+start + 15*60e3);
+  updateDur();
+}
+function updateDur(){
+  const a = new Date($("inInicio").value).getTime(), b = new Date($("inCierre").value).getTime();
+  if (!a || !b) { $("durText").textContent = ""; return; }
+  if (b <= a) { $("durText").textContent = "La hora de término debe ser posterior a la de inicio."; return; }
+  const min = Math.round((b - a)/60000), h = Math.floor(min/60), mm = min % 60;
+  const minutes = Math.round((b - a)/60000);
+  $("durQuick").querySelectorAll("[data-min]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.min === minutes));
+  $("durText").textContent = `Duración: ${h ? h + (h === 1 ? " hora" : " horas") : ""}${h && mm ? " y " : ""}${mm ? mm + " minutos" : ""}. Al terminar, se entrega automáticamente lo que el alumno haya escrito.`;
+}
+$("durQuick").addEventListener("click", e => {
+  const b = e.target.closest("[data-min]"); if (!b) return;
+  const a = new Date($("inInicio").value).getTime(); if (!a) return;
+  $("inCierre").value = toLocalInput(a + (+b.dataset.min)*60e3); updateDur();
+});
+$("inInicio").addEventListener("input", () => {
+  const a = new Date($("inInicio").value).getTime(), dur = +($("durQuick").querySelector('[aria-pressed="true"]')?.dataset.min || 15);
+  if (a) $("inCierre").value = toLocalInput(a + dur*60e3);
+  updateDur();
+});
+$("inInicio").addEventListener("input", updateDur); $("inCierre").addEventListener("input", updateDur);
+function checkStep1(){
+  const inicio = new Date($("inInicio").value).getTime(), cierre = new Date($("inCierre").value).getTime();
+  if (!$("inTitulo").value.trim()) return "Escribe el título de la evaluación.";
+  if (!cleanSalon($("inSalon").value)) return "Escribe la sección a la que va dirigida (por ejemplo A o B).";
+  if (!inicio || !cierre) return "Indica cuándo empieza y cuándo termina.";
+  if (cierre <= inicio) return "La hora de término debe ser posterior a la de inicio.";
+  if (cierre <= Date.now()) return "La hora de término ya pasó. Elige una hora futura.";
+  return "";
+}
+function showStep1(open){
+  $("step1").hidden = !open; $("step1Sum").hidden = open;
+  if (!open) {
+    const inicio = new Date($("inInicio").value).getTime(), cierre = new Date($("inCierre").value).getTime();
+    $("sumTitle").textContent = `${$("inTitulo").value.trim()} · ${salonName(cleanSalon($("inSalon").value))}`;
+    $("sumText").textContent = [windowText({inicio, cierre}), $("inCurso").value.trim(), $("inCodigo").value.trim(), $("inDocente").value.trim(), $("inCiclo").value.trim() && "Ciclo " + $("inCiclo").value.trim()].filter(Boolean).join(" · ");
+  }
+}
+$("btnStep1").onclick = () => {
+  const e = checkStep1(); $("step1Err").textContent = e; $("step1Err").hidden = !e;
+  if (e) return;
+  showStep1(false); $("startBox").hidden = false;
+  $("startBox").scrollIntoView({behavior:"smooth", block:"start"});
+};
+$("btnEditStep1").onclick = () => { showStep1(true); $("step1").scrollIntoView({behavior:"smooth", block:"start"}); };
+function resetCreate(){
+  draft = []; $("editor").hidden = true; $("startBox").hidden = true; showStep1(true); $("step1Err").hidden = true; $("pubErr").hidden = true;
+  $("inTitulo").value = ""; defaultTimes();
+  ["chWord","chManual"].forEach(id => $(id).setAttribute("aria-pressed", false)); $("wordBox").hidden = true; $("genOpts").hidden = true;
+  $("file").value = ""; $("fileName").textContent = "Solo archivos .docx"; $("genStatus").textContent = "";
+}
+defaultTimes();
+
+$("chWord").onclick = () => {
+  $("chWord").setAttribute("aria-pressed", true); $("chManual").setAttribute("aria-pressed", false);
+  $("wordBox").hidden = false;
+};
+$("chManual").onclick = () => {
+  $("chManual").setAttribute("aria-pressed", true); $("chWord").setAttribute("aria-pressed", false);
+  $("wordBox").hidden = true;
+  if (!draft.length) draft = [{pregunta:"", fotos:false, puntos: parseNum($("inPtsAll").value) ?? 2}];
+  openEditor();
+  setTimeout(() => $("edList").querySelector("textarea")?.focus({preventScroll:true}), 400);
+};
+$("btnDiscard").onclick = () => { resetCreate(); window.scrollTo({top:0}); };
+
+/* ---------- Fotos ---------- */
+function loadImg(src){ return new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = src; }); }
+async function compress(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImg(url);
+    let max = 1600, q = 0.75, out, w, h;
+    for (let k = 0; k < 8; k++) {
+      const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      w = Math.round(img.naturalWidth * s); h = Math.round(img.naturalHeight * s);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,w,h); g.drawImage(img, 0, 0, w, h);
+      out = c.toDataURL("image/jpeg", q);
+      if (out.length < 230000) break;
+      if (q > 0.5) q -= 0.1; else max = Math.round(max * 0.8);
+    }
+    return {data: out.split(",")[1], w, h};
+  } finally { URL.revokeObjectURL(url); }
+}
+const imgSrc = f => "data:image/jpeg;base64," + f.data;
+function thumbs(list, removable){
+  return list.map((f,k) => `<div class="thumb"><img src="${imgSrc(f)}" alt="Foto ${k+1} del desarrollo" data-zoom>${removable ? `<button type="button" data-rm="${k}" aria-label="Quitar foto ${k+1}">Quitar</button>` : ""}</div>`).join("");
+}
+document.addEventListener("click", e => {
+  const z = e.target.closest("img[data-zoom]"); if (!z) return;
+  $("lightImg").src = z.src; $("lightbox").hidden = false;
+});
+$("lightbox").onclick = () => { $("lightbox").hidden = true; $("lightImg").removeAttribute("src"); };
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("lightbox").hidden) $("lightbox").click(); });
+async function fotosOf(resultId){
+  const s = await db.collection("fotos").where("resultId","==",resultId).get();
+  const out = [];
+  s.docs.map(d => d.data()).sort((a,b) => a.q - b.q || a.k - b.k).forEach(f => { (out[f.q] ||= []).push({data:f.data, w:f.w, h:f.h}); });
+  return out;
+}
+
+/* ---------- Subir Word ---------- */
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) readDocx(f); });
+$("file").onchange = e => { const f = e.target.files[0]; if (f) readDocx(f); };
+
+async function readDocx(f){
+  if (!/\.docx$/i.test(f.name)) { $("fileName").textContent = "Ese archivo no es .docx. En Word usa Guardar como → Documento de Word (.docx) y vuelve a subirlo."; return; }
+  $("fileName").textContent = "Leyendo " + f.name + "…";
+  try {
+    const r = await mammoth.extractRawText({arrayBuffer: await f.arrayBuffer()});
+    docText = r.value.replace(/\n{3,}/g,"\n\n").trim();
+    if (!docText) throw new Error("vacío");
+    $("fileName").textContent = `${f.name} · ${docText.split(/\s+/).length} palabras`;
+    if (!$("inTitulo").value.trim()) $("inTitulo").value = f.name.replace(/\.docx$/i,"");
+    $("genOpts").hidden = false;
+    $("inModo").value = "doc";
+    $("inCant").closest("label").hidden = $("inModo").value === "doc";
+    $("genStatus").textContent = "";
+  } catch { $("fileName").textContent = "No se pudo leer el archivo. Revisa que no esté dañado ni protegido con contraseña."; }
+}
+const CALC = /(calcul|hall|determin|resuelv|resolver|obten|cu[aá]nto|problema|densidad de|masa de|valor de)/i;
+function parseDoc(t){
+  const lines = t.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const qs = []; let q = null;
+  const qRe = /^(?:pregunta\s*)?(\d{1,2})\s*(?:\.-|[.)\-:])\s*(.+)$/i;
+  for (const l of lines){
+    const m = l.match(qRe);
+    if (m) { q = {pregunta:m[2]}; qs.push(q); continue; }
+    if (q && q.pregunta.length < 600) q.pregunta += "\n" + l;
+  }
+  return qs.map(x => ({pregunta:x.pregunta.trim(), fotos: CALC.test(x.pregunta)}));
+}
+
+$("inModo").onchange = () => { $("inCant").closest("label").hidden = $("inModo").value === "doc"; };
+$("btnGen").onclick = async () => {
+  const n = Math.max(1, Math.min(30, parseInt($("inCant").value,10) || 6));
+  const st = $("genStatus");
+  const base = parseNum($("inPtsAll").value) ?? 2;
+  if ($("inModo").value === "doc"){
+    const qs = parseDoc(docText);
+    if (!qs.length){ st.textContent = "No encontré preguntas numeradas en el documento. Revisa que cada pregunta empiece con su número (1.-, 2.-…) o escríbelas tú mismo."; return; }
+    draft = qs.map(q => ({...q, puntos: base}));
+    st.textContent = `Se leyeron ${qs.length} preguntas del documento.`;
+    openEditor(); return;
+  }
+  if (!sample){ st.textContent = "La generación con Claude no está disponible en esta vista. Usa “Usar las preguntas ya escritas”."; return; }
+  const btn = $("btnGen"); btn.disabled = true; st.textContent = "Claude está leyendo el documento y redactando las preguntas…";
+  try {
+    const out = await sample.json(
+`Eres un docente universitario que prepara una evaluación escrita en español.
+A partir del CONTENIDO, redacta exactamente ${n} preguntas de desarrollo (NO de alternativas).
+Cada pregunta debe pedir al alumno que explique, justifique o sustente su respuesta.
+Si el contenido incluye fórmulas, mediciones o procedimientos numéricos, incluye problemas de cálculo con datos concretos y marca "calculo": true en ellos.
+Cubre distintas partes del contenido y no inventes datos ajenos al tema.
+Responde SOLO con JSON con esta forma:
+{"preguntas":[{"pregunta":"texto de la pregunta","calculo":false}]}
+
+CONTENIDO:
+"""${docText.slice(0, 40000)}"""`, {modelTier:"default"});
+    const arr = (out?.preguntas || []).filter(q => q && q.pregunta).map(q => ({pregunta:String(q.pregunta), fotos: !!q.calculo, puntos:base}));
+    if (!arr.length) throw {message:"La respuesta no traía preguntas."};
+    draft = arr; st.textContent = `Claude redactó ${arr.length} preguntas. Revísalas antes de publicar.`;
+    openEditor();
+  } catch (e) {
+    st.textContent = e?.code === "not_granted" ? "No se dio permiso para usar Claude. Puedes usar las preguntas ya escritas en el documento."
+      : e?.code === "rate_limited" ? "Demasiadas solicitudes seguidas. Espera un minuto y vuelve a intentarlo."
+      : "No se pudieron generar las preguntas: " + (e?.message || "error desconocido");
+  } finally { btn.disabled = false; }
+};
+
+/* ---------- Editor ---------- */
+async function loadDocDefaults(){
+  try { const c = await db.doc("config/docInfo").get(); if (c.exists) { const d = c.data();
+    ["curso","codigo","docente","ciclo","salon"].forEach(k => { const el = $("in" + k[0].toUpperCase() + k.slice(1)); if (!el.value && d[k]) el.value = d[k]; }); } } catch {}
+}
+function openEditor(){
+  renderEditor();
+  $("editor").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function updateDraftTotal(){
+  $("edCount").textContent = draft.length === 1 ? "1 pregunta" : draft.length + " preguntas";
+  $("edTotal").textContent = plural(r2(draft.reduce((s,q) => s + (q.puntos ?? 0), 0)), "punto");
+}
+function renderEditor(){
+  $("editor").hidden = false;
+  $("edList").innerHTML = draft.map((q,i) => `
+    <li data-i="${i}"><div class="qbody">
+      <div class="qhead">
+        <textarea data-k="pregunta" rows="3" aria-label="Pregunta ${i+1}" placeholder="Escribe aquí la pregunta">${esc(q.pregunta)}</textarea>
+        <label class="ptsin">Puntos<input type="text" inputmode="decimal" data-p value="${inFmt(q.puntos ?? 1)}" aria-label="Puntos de la pregunta ${i+1}"></label>
+      </div>
+      <div class="row" style="gap:10px;align-items:center;justify-content:space-between">
+        <label class="check" style="flex:1 1 auto"><input type="checkbox" data-f ${q.fotos?"checked":""}> El alumno puede subir fotos (para cálculos)</label>
+        <button class="danger small" data-act="del" type="button">Quitar</button>
+      </div>
+    </div></li>`).join("");
+  updateDraftTotal();
+}
+$("edList").addEventListener("input", e => {
+  const li = e.target.closest("li"); if (!li) return; const q = draft[+li.dataset.i];
+  if (e.target.dataset.k) q.pregunta = e.target.value;
+  if (e.target.hasAttribute("data-p")) {
+    const v = parseNum(e.target.value);
+    e.target.style.borderColor = v === null ? "var(--red)" : "";
+    q.puntos = v; updateDraftTotal();
+  }
+});
+$("edList").addEventListener("change", e => {
+  if (!e.target.hasAttribute("data-f")) return;
+  draft[+e.target.closest("li").dataset.i].fotos = e.target.checked;
+});
+$("edList").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act=del]"); if (!b) return;
+  draft.splice(+b.closest("li").dataset.i, 1); renderEditor();
+});
+$("btnPtsAll").onclick = () => {
+  const v = parseNum($("inPtsAll").value);
+  if (v === null) { $("inPtsAll").style.borderColor = "var(--red)"; return; }
+  $("inPtsAll").style.borderColor = ""; draft.forEach(q => q.puntos = v); renderEditor();
+};
+$("btnAddQ").onclick = () => { draft.push({pregunta:"", fotos:false, puntos: parseNum($("inPtsAll").value) ?? 2}); renderEditor();
+  const last = $("edList").lastElementChild; last?.querySelector("textarea")?.focus(); last?.scrollIntoView({behavior:"smooth", block:"center"}); };
+$("btnPub").onclick = async () => {
+  const err = $("pubErr"); err.hidden = true;
+  const fail = m => { err.textContent = m; err.hidden = false; };
+  if (draft.some(q => q.puntos === null)) return fail("Hay puntajes no válidos (marcados en rojo). Usa números como 1, 2 o 1,5.");
+  const qs = draft.map(q => ({pregunta:q.pregunta.trim(), puntos:q.puntos, fotos:!!q.fotos})).filter(q => q.pregunta);
+  if (!qs.length) return fail("La evaluación necesita al menos una pregunta.");
+  const e1 = checkStep1();
+  if (e1) { showStep1(true); $("step1Err").textContent = e1; $("step1Err").hidden = false; $("step1").scrollIntoView({behavior:"smooth", block:"start"}); return fail("Revisa los datos del paso 1: " + e1); }
+  const inicio = new Date($("inInicio").value).getTime(), cierre = new Date($("inCierre").value).getTime();
+  const salon = cleanSalon($("inSalon").value);
+  const doc = {curso:$("inCurso").value.trim(), codigo:$("inCodigo").value.trim(), docente:$("inDocente").value.trim(), ciclo:$("inCiclo").value.trim()};
+  $("btnPub").disabled = true;
+  try {
+    await db.collection("tests").add({titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()});
+    salonSel = salon;
+    db.doc("config/docInfo").set({...doc, salon}).catch(()=>{});
+    resetCreate();
+    toast("Evaluación publicada.");
+    showTab("tabLista");
+  } catch (e) { fail("No se pudo publicar: " + e.message); }
+  finally { $("btnPub").disabled = false; }
+};
+
+/* ---------- Listados ---------- */
+function testCard(t){ const st = statusOf(t); return `
+      <div class="test" data-id="${t.id}">
+        <div class="meta"><h3>${esc(t.titulo)}</h3>
+          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${t.preguntas?.length||0} preguntas · ${plural(totalOf(t),"punto")}</span></div></div>
+        <div class="actions">
+          <button class="small" data-act="res" type="button">Ver entregas</button>
+          <button class="ghost small" data-act="sched" type="button">Editar horario y sección</button>
+          ${st === "abierta" ? '<button class="ghost small" data-act="closenow" type="button">Cerrar ahora</button>' : ""}
+          <button class="danger small" data-act="del" type="button">Eliminar</button>
+        </div>
+        <div class="sched" data-sched hidden>
+          <div class="row">
+            <label>Empieza<input type="datetime-local" data-ini value="${toLocalInput(t.inicio)}"></label>
+            <label>Termina<input type="datetime-local" data-fin value="${toLocalInput(t.cierre)}"></label>
+            <label style="flex:0 1 150px">Sección<input type="text" data-sal list="salonList" value="${esc(t.salon || "")}"></label>
+            <button class="small" data-act="schedsave" type="button">Guardar</button>
+          </div>
+          <span class="err" data-schederr hidden></span>
+        </div>
+        <div class="confirm" data-confirm hidden style="flex-basis:100%"><span>¿Eliminar esta evaluación? Las entregas de los alumnos se conservan, pero ya no podrás abrirlas desde aquí.</span>
+          <button class="danger small" data-act="delyes" type="button" style="border-color:var(--red)">Sí, eliminar</button><button class="ghost small" data-act="delno" type="button">Cancelar</button></div>
+      </div>`; }
+$("salonFilter").addEventListener("click", e => { const b = e.target.closest("[data-salon]"); if (b) { salonSel = b.dataset.salon; renderTests(); } });
+function renderTests(){
+  if (!session) return;
+  if (session.rol === "profe"){
+    const ss = salones();
+    if (salonSel !== "todos" && !ss.includes(salonSel)) salonSel = "todos";
+    $("salonFilter").innerHTML = ss.length > 1 ? [["todos","Todos"], ...ss.map(s => [s, salonName(s)])].map(([v,l]) =>
+      `<button type="button" class="pill" data-salon="${esc(v)}" aria-pressed="${salonSel === v}">${esc(l)}<span>${v === "todos" ? tests.length : tests.filter(t => salonOf(t) === v).length}</span></button>`).join("") : "";
+    const groups = salonSel === "todos" ? ss : [salonSel];
+    $("tList").innerHTML = tests.length ? groups.map(s => `<div class="group"><h3 class="group-title">${esc(salonName(s))}</h3>${tests.filter(t => salonOf(t) === s).map(testCard).join("")}</div>`).join("")
+      : '<div class="empty">Aún no hay evaluaciones. Créala en “Crear evaluación”.</div>';
+  } else {
+    const done = new Set(myResults.map(r => r.testId));
+    const list = tests.filter(t => sameSec(salonOf(t), session.salon) && statusOf(t) !== "cerrada" && !done.has(t.id)).sort((a,b) => a.inicio - b.inicio);
+    $("aTests").innerHTML = list.length ? list.map(t => { const st = statusOf(t); return `
+      <div class="test" data-id="${t.id}">
+        <div class="meta"><h3>${esc(t.titulo)}</h3><div class="who">${STATUS_CHIP[st]}<span>${st === "abierta" ? "Cierra a las " + fmtHour(t.cierre) : "Abre el " + fmtDate(t.inicio)} · ${t.preguntas?.length||0} preguntas · ${plural(totalOf(t),"punto")}</span></div></div>
+        <div class="actions">${st === "abierta" ? '<button class="small" data-act="take" type="button">Comenzar</button>' : '<button class="small" type="button" disabled>Aún no abre</button>'}</div>
+      </div>`; }).join("") : '<div class="empty">No tienes evaluaciones pendientes. Cuando tu profesor publique una, aparecerá aquí.</div>';
+    $("aPast").innerHTML = myResults.length ? myResults.map(r => `
+      <div class="test" data-rid="${esc(r.id)}">
+        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "anulada" ? "Anulada" : "Entregada"} ${fmtDate(r.fecha)}</span></div></div>
+        <div class="actions"><button class="small" data-act="view" type="button">Ver</button>${r.estado === "anulada" || r.estado === "en_curso" ? "" : '<button class="ghost small" data-act="docx" type="button">Descargar Word</button>'}</div>
+      </div>`).join("") : '<div class="empty">Todavía no has entregado evaluaciones.</div>';
+  }
+}
+
+$("tList").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const box = b.closest(".test"), id = box.dataset.id, t = tests.find(x => x.id === id);
+  const act = b.dataset.act;
+  if (act === "del") box.querySelector("[data-confirm]").hidden = false;
+  if (act === "delno") box.querySelector("[data-confirm]").hidden = true;
+  if (act === "delyes") { await db.doc("tests/"+id).delete().catch(()=>{}); if (revDoc?.r.testId === id) $("revBox").hidden = true; }
+  if (act === "sched") { const s = box.querySelector("[data-sched]"); s.hidden = !s.hidden; }
+  if (act === "closenow") await db.doc("tests/"+id).update({cierre: Date.now()}).catch(()=>{});
+  if (act === "schedsave") {
+    const ini = new Date(box.querySelector("[data-ini]").value).getTime(), fin = new Date(box.querySelector("[data-fin]").value).getTime();
+    const er = box.querySelector("[data-schederr]");
+    const sal = cleanSalon(box.querySelector("[data-sal]").value);
+    if (!ini || !fin || fin <= ini) { er.textContent = "La hora de término debe ser posterior a la de inicio."; er.hidden = false; return; }
+    if (!sal) { er.textContent = "Escribe la sección."; er.hidden = false; return; }
+    try { await db.doc("tests/"+id).update({inicio:ini, cierre:fin, salon:sal}); toast("Cambios guardados."); } catch (x) { er.textContent = "No se pudo guardar: " + x.message; er.hidden = false; }
+  }
+  if (act === "res") guard(() => showResults(t));
+});
+
+/* ---------- Entregas y corrección ---------- */
+let revDirty = false, guardAction = null, resTest = null;
+function guard(action){
+  if (!revDirty || !revDoc || $("revBox").hidden) { action(); return; }
+  guardAction = action;
+  $("revGuardText").textContent = `Tienes cambios sin guardar en la nota de N° ${revDoc.r.lista} · ${revDoc.r.apellido}. ¿Qué quieres hacer?`;
+  $("revGuard").hidden = false; $("revGuard").scrollIntoView({behavior:"smooth", block:"center"});
+}
+$("revGuardSave").onclick = async () => { const a = guardAction; guardAction = null; $("revGuard").hidden = true; if (await saveGrade(false)) a?.(); };
+$("revGuardDrop").onclick = () => { const a = guardAction; guardAction = null; revDirty = false; $("revGuard").hidden = true; a?.(); };
+$("revGuardBack").onclick = () => { guardAction = null; $("revGuard").hidden = true; };
+window.addEventListener("beforeunload", e => { if (revDirty) { e.preventDefault(); e.returnValue = ""; } });
+
+const pendingRows = exceptId => resRows.filter(r => r.estado === "entregada" && r.id !== exceptId);
+function estadoChip(r){
+  if (r.estado === "corregida") return '<span class="chip ok">CALIFICADA</span>';
+  if (r.estado === "entregada") return '<span class="chip brass">POR CALIFICAR</span>';
+  if (r.estado === "anulada") return `<span class="chip red" title="${esc(r.motivo || "")}">ANULADA</span>`;
+  return resTest && Date.now() > resTest.cierre ? '<span class="chip off">NO ENTREGÓ</span>' : '<span class="chip">RINDIENDO</span>';
+}
+function nextPending(r){ const p = pendingRows(r?.id); return p.find(x => x.lista > (r?.lista ?? -1)) || p[0] || null; }
+function renderResProgress(){
+  const gradable = resRows.filter(r => r.estado === "entregada" || r.estado === "corregida");
+  const n = gradable.length, g = gradable.filter(r => r.estado === "corregida").length, anul = resRows.filter(r => r.estado === "anulada").length;
+  $("resProg").hidden = !n || g === n; $("resDone").hidden = !n || g !== n;
+  $("resProgText").textContent = `Calificadas ${g} de ${n}` + (anul ? ` · ${anul} anulada${anul > 1 ? "s" : ""}` : "");
+  $("resProgBar").style.width = (n ? 100*g/n : 0) + "%";
+  $("resStart").hidden = !!revDoc;
+  if (revDoc) $("revSave").textContent = pendingRows(revDoc.r.id).length ? "Guardar y pasar a la siguiente" : "Guardar nota";
+}
+function showResults(t){
+  if (unsubRes) unsubRes();
+  resTest = t; resRows = [];
+  $("revBox").hidden = true; revDoc = null; revDirty = false; $("resDone").hidden = true; $("resProg").hidden = true;
+  $("resBox").hidden = false; $("resTitle").textContent = `${t.titulo} · ${salonName(salonOf(t))}`;
+  $("resBody").innerHTML = '<tr><td colspan="5" class="muted">Cargando…</td></tr>';
+  unsubRes = db.collection("resultados").where("testId","==",t.id).onSnapshot(s => {
+    resRows = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => a.lista - b.lista);
+    $("resBody").innerHTML = resRows.length ? resRows.map(r => `<tr data-id="${esc(r.id)}" tabindex="0" class="${revDoc?.r.id===r.id?"sel":""}">
+        <td class="num">${r.lista}</td><td>${esc(r.apellido)}</td>
+        <td>${estadoChip(r)}</td>
+        <td class="num">${r.estado === "corregida" ? fmt(r.puntaje) : r.estado === "anulada" ? "0" : "–"} / ${fmt(r.total)}</td><td>${fmtDate(r.fecha)}</td></tr>`).join("")
+      : '<tr><td colspan="5" class="muted" style="cursor:default">Nadie ha entregado esta evaluación todavía.</td></tr>';
+    renderResProgress();
+  }, e => { $("resBody").innerHTML = `<tr><td colspan="5" class="err">No se pudieron cargar: ${esc(e.message)}</td></tr>`; });
+  $("resBox").scrollIntoView({behavior:"smooth", block:"start"});
+}
+$("resStart").onclick = () => { const n = nextPending(null); if (n) openRow(n.id); };
+async function openRow(id){
+  const r = resRows.find(x => x.id === id); if (!r) return;
+  const qs = r.preguntas || [];
+  revDoc = {r}; revDirty = false; $("revGuard").hidden = true;
+  document.querySelectorAll("#resBody tr").forEach(x => x.classList.toggle("sel", x.dataset.id === id));
+  $("revTitle").textContent = `N° ${r.lista} · ${r.apellido}`;
+  $("revMsg").textContent = r.estado === "corregida" ? "Esta entrega ya está calificada; puedes cambiar la nota." : "";
+  $("revList").innerHTML = qs.map((q,i) => {
+    const ans = String(r.respuestas?.[i] ?? "").trim();
+    return `<li><div class="qbody">
+      <div class="qhead"><div class="qtext">${esc(q.pregunta)}</div>
+        <label class="ptsin">de ${fmt(ptsOf(q))}<input type="text" inputmode="decimal" data-rp="${i}" value="${r.puntos ? inFmt(r.puntos[i] ?? 0) : ""}" placeholder="0" aria-label="Puntos asignados en la pregunta ${i+1}"></label></div>
+      <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div>
+      <div class="photos" data-ph="${i}"></div>
+    </div></li>`; }).join("");
+  revTotal(); renderResProgress();
+  const locked = r.estado === "anulada" || r.estado === "en_curso";
+  $("revNote").hidden = !locked;
+  if (locked) $("revNote").textContent = r.estado === "anulada"
+    ? `Evaluación anulada automáticamente. Motivo: ${r.motivo || "no registrado"} Abajo ves lo que había escrito hasta ese momento.`
+    : (resTest && Date.now() > resTest.cierre ? "El alumno empezó la evaluación pero no la entregó." : "El alumno está rindiendo la evaluación en este momento.");
+  $("revList").querySelectorAll("[data-rp]").forEach(x => x.disabled = locked);
+  $("revSaveRow").hidden = locked; $("revTotalBar").hidden = locked; $("reopenBox").hidden = !locked; $("reopenConfirm").hidden = true;
+  if (locked) $("revMsg").textContent = "";
+  $("revBox").hidden = false; $("revBox").scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(() => $("revList").querySelector("[data-rp]")?.focus({preventScroll:true}), 400);
+  try {
+    const f = await fotosOf(r.id);
+    if (revDoc?.r.id !== r.id) return;
+    f.forEach((list,i) => { const el = document.querySelector(`#revList [data-ph="${i}"]`); if (el && list) el.innerHTML = thumbs(list, false); });
+  } catch {}
+}
+const rowClick = tr => { if (tr && tr.dataset.id !== revDoc?.r.id) guard(() => openRow(tr.dataset.id)); };
+$("resBody").addEventListener("click", e => rowClick(e.target.closest("tr[data-id]")));
+$("resBody").addEventListener("keydown", e => { if (e.key === "Enter") rowClick(e.target.closest("tr[data-id]")); });
+function revValues(){ return [...document.querySelectorAll("#revList [data-rp]")].map(inp => inp.value.trim() === "" ? 0 : parseNum(inp.value)); }
+function revTotal(){
+  const v = revValues();
+  $("revTotal").textContent = v.some(x => x === null) ? "Revisa los valores en rojo" : `${fmt(v.reduce((s,x)=>s+x,0))} / ${fmt(revDoc.r.total)}`;
+}
+$("revList").addEventListener("input", e => {
+  if (!e.target.dataset.rp) return;
+  revDirty = true;
+  const v = e.target.value.trim() === "" ? 0 : parseNum(e.target.value), max = ptsOf(revDoc.r.preguntas[+e.target.dataset.rp]);
+  e.target.style.borderColor = (v === null || v > max) ? "var(--red)" : "";
+  revTotal();
+});
+async function saveGrade(advance){
+  const v = revValues(), r = revDoc.r, qs = r.preguntas;
+  if (v.some((x,i) => x === null || x > ptsOf(qs[i]))) {
+    $("revMsg").textContent = "Cada puntaje debe ser un número entre 0 y el máximo de la pregunta. Corrige los que están en rojo.";
+    $("revGuard").hidden = true; return false;
+  }
+  $("revSave").disabled = true;
+  try {
+    const puntaje = r2(v.reduce((s,x)=>s+x,0));
+    await db.doc("resultados/"+r.id).update({puntos:v, puntaje, estado:"corregida", corregido:Date.now()});
+    Object.assign(r, {puntos:v, puntaje, estado:"corregida"});
+    revDirty = false;
+    const next = nextPending(r);
+    toast(`Nota guardada: N° ${r.lista} · ${r.apellido}, ${fmt(puntaje)} de ${fmt(r.total)}.` + (advance && next ? " Siguiente entrega…" : ""));
+    if (advance) {
+      if (next) openRow(next.id);
+      else { closeRev(); renderResProgress(); $("resBox").scrollIntoView({behavior:"smooth", block:"start"}); }
+    } else renderResProgress();
+    return true;
+  } catch (e) { $("revMsg").textContent = "No se pudo guardar: " + e.message + ". Inténtalo otra vez."; return false; }
+  finally { $("revSave").disabled = false; }
+}
+$("revSave").onclick = () => saveGrade(true);
+$("revReopen").onclick = () => { $("reopenConfirm").hidden = false; };
+$("reopenNo").onclick = () => { $("reopenConfirm").hidden = true; };
+$("reopenYes").onclick = async () => {
+  const r = revDoc?.r; if (!r) return;
+  $("reopenYes").disabled = true;
+  try {
+    const f = await db.collection("fotos").where("resultId","==",r.id).get();
+    for (const d of f.docs) await db.doc("fotos/" + d.id).delete();
+    await db.doc("resultados/" + r.id).delete();
+    closeRev();
+    toast(`N° ${r.lista} · ${r.apellido} puede volver a rendirla` + (resTest && statusOf(resTest) === "cerrada" ? ". La evaluación ya cerró: amplía el horario para que pueda entrar." : " mientras siga abierta."));
+  } catch (e) { $("revMsg").textContent = "No se pudo habilitar: " + e.message; $("reopenConfirm").hidden = true; }
+  finally { $("reopenYes").disabled = false; }
+};
+function closeRev(){ $("revBox").hidden = true; revDoc = null; revDirty = false; $("revGuard").hidden = true; document.querySelectorAll("#resBody tr").forEach(x => x.classList.remove("sel")); renderResProgress(); }
+function closeRes(){ closeRev(); $("resBox").hidden = true; resTest = null; if (unsubRes){ unsubRes(); unsubRes = null; } }
+$("revClose").onclick = () => guard(closeRev);
+$("resClose").onclick = () => guard(closeRes);
+
+$("fClave").onsubmit = async e => {
+  e.preventDefault();
+  if (!db) return;
+  try { await db.doc("config/main").set({claveHash: await sha($("inNueva").value)}); $("inNueva").value = ""; $("claveMsg").textContent = "Clave actualizada. Úsala la próxima vez que ingreses."; }
+  catch (er) { $("claveMsg").textContent = "No se pudo guardar la clave: " + er.message; }
+};
+
+/* ---------- Alumno: rendir ---------- */
+const GRACE_MS = 180000, BLUR_MS = 3000, LONG_INSERT = 60;
+const ABANDON = "Salió de la evaluación sin entregarla (cerró, recargó o abandonó la página).";
+const isTouch = matchMedia("(pointer: coarse)").matches;
+let guardOn = false, grace = null, hiddenAt = 0, blurT = null, blurI = null, wakeLock = null, pendingTest = null;
+const fixing = new Set();
+function showHome(){ stopTimer(); disarm(); current = null; shown = null; pendingTest = null; ["aTake","aDone","aWarn"].forEach(id => $(id).hidden = true); $("aHome").hidden = false; renderTests(); }
+const resId = t => `${t.id}_${session.lista}`;
+const flagKey = id => "anulado_" + id;
+function storedMotivo(id){ try { return localStorage.getItem(flagKey(id)); } catch { return null; } }
+async function markAnnulled(id, motivo, extra = {}){
+  const data = {estado:"anulada", motivo, anulada:Date.now(), puntos:null, puntaje:0, ...extra};
+  for (let k = 0; k < 6; k++) {
+    try { await db.doc("resultados/" + id).update(data); try { localStorage.removeItem(flagKey(id)); } catch {} return true; }
+    catch { await new Promise(r => setTimeout(r, 3000)); }
+  }
+  return false;
+}
+
+$("aTests").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-act=take]"); if (!b) return;
+  const t = tests.find(x => x.id === b.closest(".test").dataset.id); if (!t) return;
+  if (statusOf(t) !== "abierta") { renderTests(); return; }
+  b.disabled = true;
+  try {
+    const prev = await db.doc("resultados/" + resId(t)).get();
+    if (prev.exists) {
+      const d = prev.data();
+      if (norm(d.apellido) !== norm(session.apellido)) { b.disabled = false; showNote(`El número de lista ${session.lista} ya rindió "${t.titulo}" con otro apellido. Revisa tu número o avisa a tu docente.`); return; }
+      if (d.estado === "en_curso") { const motivo = storedMotivo(prev.id) || ABANDON; await markAnnulled(prev.id, motivo); showDone({id:prev.id, ...d, estado:"anulada", motivo}, true); return; }
+      showDone({id:prev.id, ...d}, true); return;
+    }
+  } catch (er) { b.disabled = false; showNote("No se pudo revisar tu evaluación: " + (er?.message || "error") + ". Vuelve a intentarlo."); return; }
+  b.disabled = false;
+  pendingTest = t;
+  $("warnTitle").textContent = t.titulo;
+  $("warnSub").textContent = `${t.preguntas.length} preguntas · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
+  $("warnOk").checked = false; $("btnStart").disabled = true; $("warnErr").hidden = true;
+  $("aHome").hidden = true; $("aWarn").hidden = false; window.scrollTo({top:0});
+});
+$("warnOk").onchange = () => { $("btnStart").disabled = !$("warnOk").checked; };
+$("warnBack").onclick = showHome;
+$("btnStart").onclick = async () => {
+  const t = pendingTest; if (!t) return;
+  const err = m => { $("warnErr").textContent = m; $("warnErr").hidden = false; };
+  if (statusOf(t) !== "abierta") return err("Esta evaluación ya no está abierta.");
+  $("btnStart").disabled = true;
+  current = t; takeFotos = t.preguntas.map(() => []);
+  try {
+    await db.doc("resultados/" + resId(t)).set({testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido,
+      preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), doc: {...(t.doc||{}), fecha: fmtDay(t.inicio)},
+      estado:"en_curso", iniciada:Date.now(), fecha:Date.now(), respuestas:[], fotos:[], puntos:null, puntaje:null});
+  } catch (er) { current = null; $("btnStart").disabled = false; return err("No se pudo iniciar: " + (er?.message || "error") + ". Vuelve a intentarlo."); }
+  pendingTest = null;
+  $("takeTitle").textContent = t.titulo;
+  $("takeSub").textContent = `${t.preguntas.length} preguntas · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
+  $("takeList").innerHTML = t.preguntas.map((q,i) => `
+    <li data-i="${i}"><div class="qbody">
+      <div class="qhead"><div class="qtext">${esc(q.pregunta)}</div><span class="pts">${plural(ptsOf(q),"pt")}</span></div>
+      <textarea class="answer" id="ans${i}" aria-label="Tu respuesta a la pregunta ${i+1}" placeholder="Escribe tu respuesta y explica tu razonamiento" spellcheck="false" autocomplete="off" autocorrect="off" writingsuggestions="false"></textarea>
+      ${q.fotos ? `<div class="addphoto">
+        ${isTouch ? `<label class="btnlike" for="cam${i}" data-grace>Tomar foto</label><input type="file" id="cam${i}" accept="image/*" capture="environment" data-ph="${i}">` : ""}
+        <label class="btnlike" for="ph${i}" data-grace>${isTouch ? "Elegir de la galería" : "Subir fotos"}</label><input type="file" id="ph${i}" accept="image/*" multiple data-ph="${i}">
+        <span class="muted small-text" data-phmsg="${i}">Hasta ${MAX_FOTOS} fotos. Tienes 3 minutos para volver.</span></div>
+      <div class="photos" data-phlist="${i}"></div>` : ""}
+    </div></li>`).join("");
+  $("takeErr").hidden = true; $("takeConfirm").hidden = true;
+  $("aWarn").hidden = true; $("aTake").hidden = false; updateProgress(); startTimer(); arm(); window.scrollTo({top:0});
+};
+
+/* Vigilancia durante la evaluación */
+function arm(){ guardOn = true; $("logout").hidden = true; requestWake(); }
+function disarm(){ guardOn = false; cancelBlur(); if (grace) { clearTimeout(grace.t); grace = null; } releaseWake(); $("logout").hidden = false; }
+async function requestWake(){ try { wakeLock = (await navigator.wakeLock?.request("screen")) || null; } catch { wakeLock = null; } }
+function releaseWake(){ try { wakeLock?.release(); } catch {} wakeLock = null; }
+function startGrace(){ if (grace) clearTimeout(grace.t); grace = {t: setTimeout(graceExpired, GRACE_MS)}; hiddenAt = 0; cancelBlur(); }
+function endGrace(delay){
+  const g = grace; if (!g) return;
+  setTimeout(() => { if (grace !== g) return; clearTimeout(g.t); grace = null; if (guardOn && !document.hidden && !document.hasFocus()) startBlur(); }, delay);
+}
+function graceExpired(){ grace = null; if (guardOn && (document.hidden || !document.hasFocus())) annul("Tardó más de 3 minutos fuera de la evaluación al subir fotos."); }
+function startBlur(){
+  if (!guardOn || grace || blurT) return;
+  let n = Math.round(BLUR_MS/1000); $("blurCount").textContent = n; $("blurOverlay").hidden = false;
+  blurI = setInterval(() => { n = Math.max(0, n - 1); $("blurCount").textContent = n; }, 1000);
+  blurT = setTimeout(() => { blurT = null; annul("Salió de la ventana de la evaluación por más de 3 segundos."); }, BLUR_MS);
+}
+function cancelBlur(){ clearTimeout(blurT); blurT = null; clearInterval(blurI); blurI = null; $("blurOverlay").hidden = true; }
+$("blurBack").onclick = () => { try { window.focus(); } catch {} cancelBlur(); };
+document.addEventListener("visibilitychange", () => {
+  if (!guardOn) return;
+  if (document.hidden) {
+    if (grace) { hiddenAt = Date.now(); return; }
+    annul("Cambió de pestaña o de aplicación, minimizó el navegador o se apagó la pantalla.");
+  } else {
+    if (grace) {
+      if (hiddenAt && Date.now() - hiddenAt > GRACE_MS) { annul("Tardó más de 3 minutos fuera de la evaluación al subir fotos."); return; }
+      hiddenAt = 0; endGrace(2500);
+    }
+    requestWake();
+  }
+});
+window.addEventListener("blur", () => { if (guardOn && !grace && !document.hidden) startBlur(); });
+window.addEventListener("focus", () => { cancelBlur(); if (grace) endGrace(1500); });
+window.addEventListener("pagehide", () => { if (guardOn && current) { try { localStorage.setItem(flagKey(resId(current)), ABANDON); } catch {} } });
+window.addEventListener("beforeunload", e => { if (guardOn) { e.preventDefault(); e.returnValue = ""; } });
+["copy","cut"].forEach(ev => document.addEventListener(ev, e => { if (!guardOn) return; e.preventDefault(); annul("Copió o cortó texto durante la evaluación."); }));
+const PASTE_OFF = "Pegar (Ctrl+V) está desactivado durante la evaluación. Escribe tu respuesta.";
+document.addEventListener("paste", e => { if (!guardOn) return; e.preventDefault(); e.stopPropagation(); toast(PASTE_OFF, "info"); }, true);
+document.addEventListener("dragover", e => { if (guardOn) e.preventDefault(); });
+document.addEventListener("drop", e => { if (!guardOn) return; e.preventDefault(); annul("Arrastró texto o archivos hacia la evaluación."); });
+document.addEventListener("beforeinput", e => {
+  if (!guardOn) return;
+  if (/^insertFrom(Paste|Yank)/.test(e.inputType)) { e.preventDefault(); toast(PASTE_OFF, "info"); }
+  else if (e.inputType === "insertFromDrop") { e.preventDefault(); annul("Arrastró texto o archivos hacia la evaluación."); }
+  else if (e.inputType === "insertText" && (e.data || "").length > LONG_INSERT) { e.preventDefault(); annul("Insertó de golpe un texto largo (posible texto copiado o generado)."); }
+});
+document.addEventListener("contextmenu", e => { if (guardOn && (!isTouch || !e.target.closest("textarea"))) e.preventDefault(); });
+document.addEventListener("keydown", e => {
+  if (guardOn && (((e.ctrlKey || e.metaKey) && !e.altKey && (e.key.toLowerCase() === "v" || e.code === "KeyV")) || (e.shiftKey && e.key === "Insert"))) { e.preventDefault(); e.stopPropagation(); toast(PASTE_OFF, "info"); return; }
+  if (guardOn && (e.key === "F12" || ((e.ctrlKey || e.metaKey) && e.shiftKey && /^[ijc]$/i.test(e.key)))) { e.preventDefault(); annul("Intentó abrir las herramientas del navegador."); }
+});
+function annul(motivo){
+  if (!guardOn || !current) return;
+  const t = current, id = resId(t);
+  const respuestas = t.preguntas.map((_,i) => ($("ans"+i)?.value || "").trim());
+  disarm(); stopTimer();
+  try { localStorage.setItem(flagKey(id), motivo); } catch {}
+  showDone({id, testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido,
+    preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), respuestas, fotos:[],
+    estado:"anulada", motivo, puntos:null, puntaje:0, fecha:Date.now()}, false);
+  markAnnulled(id, motivo, {respuestas, fecha:Date.now()});
+}
+
+/* Fotos y respuestas */
+$("takeList").addEventListener("input", updateProgress);
+$("takeList").addEventListener("cancel", e => { if (e.target.matches?.("input[data-ph]")) endGrace(800); }, true);
+$("takeList").addEventListener("change", async e => {
+  const inp = e.target.closest("input[data-ph]"); if (!inp) return;
+  endGrace(1500);
+  const i = +inp.dataset.ph, msg = document.querySelector(`[data-phmsg="${i}"]`);
+  const files = [...inp.files].slice(0, MAX_FOTOS - takeFotos[i].length); inp.value = "";
+  if (!files.length) { msg.textContent = `Ya tienes ${MAX_FOTOS} fotos en esta pregunta. Quita una para subir otra.`; return; }
+  msg.textContent = "Preparando fotos…";
+  for (const f of files) { try { takeFotos[i].push(await compress(f)); } catch { msg.textContent = `No se pudo leer "${f.name}". Usa una foto JPG o PNG.`; } }
+  renderPhotos(i); updateProgress();
+  if (msg.textContent === "Preparando fotos…") msg.textContent = `${takeFotos[i].length} de ${MAX_FOTOS} fotos.`;
+});
+$("takeList").addEventListener("click", e => {
+  if (e.target.closest("[data-grace]")) { if (guardOn) startGrace(); return; }
+  const b = e.target.closest("button[data-rm]"); if (!b) return;
+  const i = +b.closest("[data-phlist]").dataset.phlist; takeFotos[i].splice(+b.dataset.rm, 1); renderPhotos(i); updateProgress();
+  document.querySelector(`[data-phmsg="${i}"]`).textContent = `${takeFotos[i].length} de ${MAX_FOTOS} fotos.`;
+});
+function renderPhotos(i){ document.querySelector(`[data-phlist="${i}"]`).innerHTML = thumbs(takeFotos[i], true); }
+const answeredFlags = () => current.preguntas.map((_,i) => !!$("ans"+i)?.value.trim() || takeFotos[i]?.length > 0);
+function updateProgress(){
+  if (!current) return;
+  const f = answeredFlags(), a = f.filter(Boolean).length;
+  $("progText").textContent = `Respondidas ${a} de ${f.length}`;
+  $("progBar").style.width = (100*a/f.length) + "%";
+}
+function startTimer(){
+  stopTimer();
+  const tick = () => {
+    if (!current) { stopTimer(); return; }
+    const left = current.cierre - Date.now();
+    if (left <= 0) { $("countdown").textContent = "tiempo terminado"; stopTimer(); deliver(true); return; }
+    const h = Math.floor(left/3600e3), m = Math.floor(left%3600e3/60e3), s = Math.floor(left%60e3/1e3);
+    $("countdown").textContent = `quedan ${h ? h + " h " : ""}${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    $("countdown").classList.toggle("late", left < 5*60e3);
+  };
+  tick(); timer = setInterval(tick, 1000);
+}
+function stopTimer(){ if (timer) { clearInterval(timer); timer = null; } }
+$("fTake").onsubmit = e => {
+  e.preventDefault();
+  const falt = answeredFlags().filter(x => !x).length;
+  if (falt) {
+    $("takeConfirmText").textContent = `Te falta${falt>1?"n":""} ${falt} pregunta${falt>1?"s":""} sin respuesta. ¿Quieres entregar igual?`;
+    $("takeConfirm").hidden = false; $("takeConfirm").scrollIntoView({behavior:"smooth", block:"center"}); return;
+  }
+  deliver(false);
+};
+$("takeConfirmYes").onclick = () => deliver(false);
+$("takeConfirmNo").onclick = () => { $("takeConfirm").hidden = true; };
+
+async function deliver(auto){
+  if (submitting || !current || !guardOn) return;
+  submitting = true; disarm(); $("btnSubmit").disabled = true; $("takeConfirm").hidden = true; $("takeErr").hidden = true;
+  const t = current, id = resId(t);
+  const respuestas = t.preguntas.map((_,i) => ($("ans"+i)?.value || "").trim());
+  const fotos = takeFotos.map(l => l.length);
+  try {
+    const ref = db.doc("resultados/" + id);
+    const prev = await ref.get();
+    if (prev.exists && prev.data().estado !== "en_curso") { showDone({id, ...prev.data()}, true); return; }
+    $("btnSubmit").textContent = "Enviando…";
+    for (let i = 0; i < takeFotos.length; i++)
+      for (let k = 0; k < takeFotos[i].length; k++)
+        await db.doc(`fotos/${id}_${i}_${k}`).set({resultId:id, testId:t.id, lista:session.lista, q:i, k, ...takeFotos[i][k]});
+    const data = {testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido, respuestas, fotos,
+      preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), doc: {...(t.doc||{}), fecha: fmtDay(t.inicio)},
+      estado:"entregada", puntos:null, puntaje:null, fecha:Date.now(), automatica:auto};
+    await ref.set(data);
+    try { localStorage.removeItem(flagKey(id)); } catch {}
+    stopTimer(); showDone({id, ...data}, false, auto);
+  } catch (er) {
+    $("takeErr").textContent = (er?.code === "quota_exceeded" ? "No hay espacio para guardar las fotos. Avisa a tu docente." : "No se pudo entregar: " + (er?.message || "error") + ".") + " Tus respuestas siguen aquí; vuelve a intentarlo.";
+    $("takeErr").hidden = false;
+    if (current && !auto) arm();
+  } finally { submitting = false; $("btnSubmit").disabled = false; $("btnSubmit").textContent = "Entregar"; }
+}
+
+/* ---------- Alumno: ver y descargar ---------- */
+$("aPast").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const r = myResults.find(x => x.id === b.closest(".test").dataset.rid); if (!r) return;
+  if (b.dataset.act === "view") showDone(r, false);
+  if (b.dataset.act === "docx") downloadDocx(r, b);
+});
+function showDone(r, repeated, auto){
+  stopTimer(); current = null; shown = r;
+  $("aHome").hidden = true; $("aTake").hidden = true; $("aDone").hidden = false;
+  const graded = r.estado === "corregida", annulled = r.estado === "anulada";
+  $("doneScore").textContent = graded ? fmt(r.puntaje) : annulled ? "0" : "–";
+  $("doneOf").textContent = `de ${fmt(r.total)} puntos`;
+  $("doneEyebrow").textContent = graded ? "CORREGIDA" : annulled ? "ANULADA" : "ENTREGADA · EN CORRECCIÓN";
+  $("doneEyebrow").className = "chip " + (graded ? "ok" : annulled ? "red" : "brass");
+  $("aDone").querySelector(".stamp").className = "stamp" + (annulled ? " bad" : "");
+  $("aDone").querySelector(".stamp").style.cssText = graded || annulled ? "" : "background:var(--warn-soft);color:var(--warn)";
+  $("doneTitle").textContent = r.titulo;
+  $("doneSub").textContent = annulled
+    ? `Tu evaluación fue anulada. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: solo él puede habilitarte para rendirla de nuevo.`
+    : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
+      + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Entregada el ${fmtDate(r.fecha)}. Tu docente aún no asigna el puntaje.`);
+  $("docxMsg").textContent = annulled ? "" : downloads ? "" : "La descarga no está disponible en esta vista.";
+  $("btnDocx").hidden = !downloads || annulled;
+  $("doneList").innerHTML = (r.preguntas||[]).map((q,i) => {
+    const ans = String(r.respuestas?.[i] ?? "").trim();
+    return `<li><div class="qbody"><div class="qhead"><div class="qtext">${esc(q.pregunta)}</div><span class="pts">${graded ? fmt(r.puntos?.[i] ?? 0) : "–"} / ${fmt(ptsOf(q))}</span></div>
+      <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div><div class="photos" data-dph="${i}"></div></div></li>`; }).join("");
+  window.scrollTo({top:0});
+  if ((r.fotos||[]).some(n => n > 0)) fotosOf(r.id).then(f => { if (shown?.id !== r.id) return; f.forEach((l,i) => { const el = document.querySelector(`[data-dph="${i}"]`); if (el && l) el.innerHTML = thumbs(l, false); }); }).catch(()=>{});
+}
+$("doneBack").onclick = showHome;
+$("btnDocx").onclick = () => shown && downloadDocx(shown, $("btnDocx"));
+
+async function downloadDocx(r, btn){
+  const msg = $("aDone").hidden ? null : $("docxMsg");
+  const say = m => { if (msg) msg.textContent = m; else showNote(m); };
+  if (!downloads) return say("La descarga no está disponible en esta vista.");
+  btn.disabled = true; say("Preparando documento…");
+  try {
+    const fotos = (r.fotos||[]).some(n => n > 0) ? await fotosOf(r.id) : [];
+    const bytes = await DocxBuilder.build(JSZip, CREST, {
+      info: {curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:r.doc?.docente||"", ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
+      titulo:r.titulo, lista:r.lista, apellido:r.apellido, preguntas:r.preguntas||[], respuestas:r.respuestas||[], fotos,
+      puntos: r.estado === "corregida" ? r.puntos : null, total:r.total, puntaje:r.puntaje||0, entregado: fmtDate(r.fecha), fmt});
+    const name = `${r.titulo} - ${String(r.lista).padStart(2,"0")} ${r.apellido}.docx`.replace(/[\\/:*?"<>|]/g, "");
+    await downloads.save({filename:name, data:bytes});
+    say("");
+    if (!msg) $("dbNote").hidden = true;
+  } catch (e) {
+    say(e?.code === "declined" ? "Descarga cancelada." : e?.code === "rate_limited" ? "Espera un momento y vuelve a intentarlo." : "No se pudo crear el documento: " + (e?.message || "error"));
+  } finally { btn.disabled = false; }
+}
+</script>
+
+</body>
+</html>

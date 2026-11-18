@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // La página usa solo estas cuatro colecciones.
+    match /{coleccion}/{id} {
+      allow read, write: if coleccion in ['tests', 'resultados', 'fotos', 'config'];
+    }
+  }
+}
