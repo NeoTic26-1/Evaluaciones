@@ -704,8 +704,29 @@ const STATUS_CHIP = {proxima:'<span class="chip brass">PRÓXIMA</span>', abierta
     tests = s.docs.map(d => ({id:d.id, ...d.data()})).filter(t => t.inicio && t.cierre).sort((a,b)=>(b.inicio||0)-(a.inicio||0));
     fillSalones();
     renderTests();
+    autoPurge();
   }, e => showNote("No se pudieron cargar las evaluaciones (" + (e.code || e.message) + "). Revisa las reglas de Firestore."));
 })();
+const RET_DAYS = 30;
+const nPreg = t => { const n = t.preguntas?.length || 0; return n === 1 ? "1 pregunta" : n + " preguntas"; };
+const purgeAt = t => (t.cierre || 0) + RET_DAYS * 864e5;
+const keepUntil = r => { const t = tests.find(x => x.id === r.testId); return t ? fmtDay(purgeAt(t)) : null; };
+async function deleteEvaluation(id){
+  for (const col of ["fotos", "resultados"]) {
+    const s = await db.collection(col).where("testId", "==", id).get();
+    for (const d of s.docs) await db.doc(col + "/" + d.id).delete();
+  }
+  await db.doc("tests/" + id).delete();
+}
+let purgeDone = false;
+async function autoPurge(){
+  if (purgeDone || !db || session?.rol !== "profe") return;
+  purgeDone = true;
+  const old = tests.filter(t => Date.now() > purgeAt(t));
+  let n = 0;
+  for (const t of old) { try { await deleteEvaluation(t.id); n++; } catch {} }
+  if (n) toast((n > 1 ? `Se borraron automáticamente ${n} evaluaciones` : "Se borró automáticamente 1 evaluación") + ` con más de ${RET_DAYS} días de cerrada, junto con sus entregas y fotos.`, "info");
+}
 const salonOf = t => String(t?.salon || "").trim() || "Sin sección";
 const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
 const sameSec = (a, b) => secKey(a) === secKey(b);
@@ -763,7 +784,7 @@ function enter(){
     : `<span class="chip">N° ${session.lista}</span> ${esc(session.apellido)} · ${esc(salonName(session.salon))}`;
   $("vProfe").hidden = session.rol!=="profe";
   $("vAlumno").hidden = session.rol!=="alumno";
-  if (session.rol==="profe") showTab(tests.length ? "tabLista" : "tabNueva");
+  if (session.rol==="profe") { showTab(tests.length ? "tabLista" : "tabNueva"); autoPurge(); }
   if (session.rol==="alumno") {
     showHome();
     unsubMine = db.collection("resultados").where("lista","==",session.lista).onSnapshot(s => {
@@ -1052,7 +1073,7 @@ $("btnPub").onclick = async () => {
 function testCard(t){ const st = statusOf(t); return `
       <div class="test" data-id="${t.id}">
         <div class="meta"><h3>${esc(t.titulo)}</h3>
-          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${t.preguntas?.length||0} preguntas · ${plural(totalOf(t),"punto")}</span></div></div>
+          <div class="who">${STATUS_CHIP[st]}<span>${windowText(t)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}${st === "cerrada" ? ` · se borra el ${fmtDay(purgeAt(t))}` : ""}</span></div></div>
         <div class="actions">
           <button class="small" data-act="res" type="button">Ver entregas</button>
           <button class="ghost small" data-act="sched" type="button">Editar horario y sección</button>
@@ -1068,7 +1089,7 @@ function testCard(t){ const st = statusOf(t); return `
           </div>
           <span class="err" data-schederr hidden></span>
         </div>
-        <div class="confirm" data-confirm hidden style="flex-basis:100%"><span>¿Eliminar esta evaluación? Las entregas de los alumnos se conservan, pero ya no podrás abrirlas desde aquí.</span>
+        <div class="confirm" data-confirm hidden style="flex-basis:100%"><span>¿Eliminar esta evaluación? Se borrarán también todas sus entregas, notas y fotos. Esto no se puede deshacer.</span>
           <button class="danger small" data-act="delyes" type="button" style="border-color:var(--red)">Sí, eliminar</button><button class="ghost small" data-act="delno" type="button">Cancelar</button></div>
       </div>`; }
 $("salonFilter").addEventListener("click", e => { const b = e.target.closest("[data-salon]"); if (b) { salonSel = b.dataset.salon; renderTests(); } });
@@ -1087,12 +1108,12 @@ function renderTests(){
     const list = tests.filter(t => sameSec(salonOf(t), session.salon) && statusOf(t) !== "cerrada" && !done.has(t.id)).sort((a,b) => a.inicio - b.inicio);
     $("aTests").innerHTML = list.length ? list.map(t => { const st = statusOf(t); return `
       <div class="test" data-id="${t.id}">
-        <div class="meta"><h3>${esc(t.titulo)}</h3><div class="who">${STATUS_CHIP[st]}<span>${st === "abierta" ? "Cierra a las " + fmtHour(t.cierre) : "Abre el " + fmtDate(t.inicio)} · ${t.preguntas?.length||0} preguntas · ${plural(totalOf(t),"punto")}</span></div></div>
+        <div class="meta"><h3>${esc(t.titulo)}</h3><div class="who">${STATUS_CHIP[st]}<span>${st === "abierta" ? "Cierra a las " + fmtHour(t.cierre) : "Abre el " + fmtDate(t.inicio)} · ${nPreg(t)} · ${plural(totalOf(t),"punto")}</span></div></div>
         <div class="actions">${st === "abierta" ? '<button class="small" data-act="take" type="button">Comenzar</button>' : '<button class="small" type="button" disabled>Aún no abre</button>'}</div>
       </div>`; }).join("") : '<div class="empty">No tienes evaluaciones pendientes. Cuando tu profesor publique una, aparecerá aquí.</div>';
     $("aPast").innerHTML = myResults.length ? myResults.map(r => `
       <div class="test" data-rid="${esc(r.id)}">
-        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "anulada" ? "Anulada" : "Entregada"} ${fmtDate(r.fecha)}</span></div></div>
+        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "anulada" ? "Anulada" : "Entregada"} ${fmtDate(r.fecha)}${r.estado !== "anulada" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
         <div class="actions"><button class="small" data-act="view" type="button">Ver</button>${r.estado === "anulada" || r.estado === "en_curso" ? "" : '<button class="ghost small" data-act="docx" type="button">Descargar Word</button>'}</div>
       </div>`).join("") : '<div class="empty">Todavía no has entregado evaluaciones.</div>';
   }
@@ -1104,7 +1125,14 @@ $("tList").addEventListener("click", async e => {
   const act = b.dataset.act;
   if (act === "del") box.querySelector("[data-confirm]").hidden = false;
   if (act === "delno") box.querySelector("[data-confirm]").hidden = true;
-  if (act === "delyes") { await db.doc("tests/"+id).delete().catch(()=>{}); if (revDoc?.r.testId === id) $("revBox").hidden = true; }
+  if (act === "delyes") {
+    b.disabled = true; b.textContent = "Eliminando…";
+    try {
+      if (resTest?.id === id) closeRes();
+      await deleteEvaluation(id);
+      toast("Evaluación eliminada con sus entregas y fotos.");
+    } catch (x) { b.disabled = false; b.textContent = "Sí, eliminar"; showNote("No se pudo eliminar: " + x.message); }
+  }
   if (act === "sched") { const s = box.querySelector("[data-sched]"); s.hidden = !s.hidden; }
   if (act === "closenow") await db.doc("tests/"+id).update({cierre: Date.now()}).catch(()=>{});
   if (act === "schedsave") {
@@ -1298,7 +1326,7 @@ $("aTests").addEventListener("click", async e => {
   b.disabled = false;
   pendingTest = t;
   $("warnTitle").textContent = t.titulo;
-  $("warnSub").textContent = `${t.preguntas.length} preguntas · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
+  $("warnSub").textContent = `${nPreg(t)} · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
   $("warnOk").checked = false; $("btnStart").disabled = true; $("warnErr").hidden = true;
   $("aHome").hidden = true; $("aWarn").hidden = false; window.scrollTo({top:0});
 });
@@ -1317,7 +1345,7 @@ $("btnStart").onclick = async () => {
   } catch (er) { current = null; $("btnStart").disabled = false; return err("No se pudo iniciar: " + (er?.message || "error") + ". Vuelve a intentarlo."); }
   pendingTest = null;
   $("takeTitle").textContent = t.titulo;
-  $("takeSub").textContent = `${t.preguntas.length} preguntas · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
+  $("takeSub").textContent = `${nPreg(t)} · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
   $("takeList").innerHTML = t.preguntas.map((q,i) => `
     <li data-i="${i}"><div class="qbody">
       <div class="qhead"><div class="qtext">${esc(q.pregunta)}</div><span class="pts">${plural(ptsOf(q),"pt")}</span></div>
@@ -1470,7 +1498,7 @@ async function deliver(auto){
     try { localStorage.removeItem(flagKey(id)); } catch {}
     stopTimer(); showDone({id, ...data}, false, auto);
   } catch (er) {
-    $("takeErr").textContent = (er?.code === "quota_exceeded" ? "No hay espacio para guardar las fotos. Avisa a tu docente." : "No se pudo entregar: " + (er?.message || "error") + ".") + " Tus respuestas siguen aquí; vuelve a intentarlo.";
+    $("takeErr").textContent = (["quota_exceeded", "resource-exhausted"].includes(er?.code) ? "La base de datos está llena. Avisa a tu docente para que elimine evaluaciones antiguas." : "No se pudo entregar: " + (er?.message || "error") + ".") + " Tus respuestas siguen aquí; vuelve a intentarlo.";
     $("takeErr").hidden = false;
     if (current && !auto) arm();
   } finally { submitting = false; $("btnSubmit").disabled = false; $("btnSubmit").textContent = "Entregar"; }
@@ -1497,7 +1525,8 @@ function showDone(r, repeated, auto){
   $("doneSub").textContent = annulled
     ? `Tu evaluación fue anulada. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: solo él puede habilitarte para rendirla de nuevo.`
     : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
-      + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Entregada el ${fmtDate(r.fecha)}. Tu docente aún no asigna el puntaje.`);
+      + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Entregada el ${fmtDate(r.fecha)}. Tu docente aún no asigna el puntaje.`)
+      + (keepUntil(r) ? ` Descarga tu Word: estará disponible hasta el ${keepUntil(r)}.` : "");
   $("docxMsg").textContent = annulled ? "" : downloads ? "" : "La descarga no está disponible en esta vista.";
   $("btnDocx").hidden = !downloads || annulled;
   $("doneList").innerHTML = (r.preguntas||[]).map((q,i) => {
