@@ -198,6 +198,9 @@ tbody tr.ina td:first-child{box-shadow:inset 4px 0 0 #3f3a39}
 .stamp.bad{background:var(--red-soft);color:var(--red)}
 .toast.info{background:var(--fg);box-shadow:0 10px 30px -10px rgba(43,52,66,.5)}
 #inSalon,#inSalonA,[data-sal]{text-transform:uppercase;text-align:center;font-weight:700;font-size:20px}
+.comment{font-weight:600;font-size:15px;color:var(--muted)}
+.comment textarea{font-weight:400;font-size:16px;color:var(--fg);min-height:64px}
+.teacher-note{padding:12px 14px;border-radius:10px;background:var(--pri-soft);border-left:4px solid var(--pri);white-space:pre-wrap;overflow-wrap:anywhere}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
 .pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
@@ -400,6 +403,7 @@ input[type=datetime-local]{min-height:50px}
       <div class="sheet">
         <div class="sheet-head"><div><h2>Mis evaluaciones</h2><p class="muted" id="listHint"></p></div></div>
         <div class="secnav" id="secNav" hidden><button class="ghost small" id="secBack" type="button">← Secciones</button><h3 id="secTitle"></h3></div>
+        <div class="row" id="secPdfRow" hidden style="align-items:center"><button class="btn-pdf" data-pdf type="button">Descargar tabla de resultados (PDF)</button><span class="muted small-text" id="secPdfMsg"></span></div>
         <div class="tests" id="tList"><div class="empty">Aún no hay evaluaciones. Créala en “Crear evaluación”.</div></div>
       </div>
 
@@ -411,7 +415,10 @@ input[type=datetime-local]{min-height:50px}
           <span id="resProgText"></span><div class="bar"><i id="resProgBar"></i></div>
           <button class="small" id="resStart" type="button">Calificar pendientes</button>
         </div>
-        <p class="note ok" id="resDone" hidden>¡Listo! Calificaste todas las entregas de esta evaluación.</p>
+        <div class="note ok" id="resDone" hidden style="display:flex;flex-direction:column;gap:10px">
+          <span>¡Listo! Calificaste todas las entregas de esta evaluación.</span>
+          <span id="resDoneSec" hidden>Ya no quedan entregas por calificar en esta sección. <button class="small btn-pdf" data-pdf type="button" style="margin-top:8px">Descargar tabla de resultados de la sección (PDF)</button></span>
+        </div>
         <div class="row"><button class="ghost small" id="absOpen" type="button">Anular examen por inasistencia</button><span></span></div>
         <div class="box" id="absBox" hidden>
           <h3>Anular examen por inasistencia</h3>
@@ -578,6 +585,7 @@ input[type=datetime-local]{min-height:50px}
 <script src="firebase-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 /* ---------- Documento Word (formato del departamento) ---------- */
 const DocxBuilder = (() => {
@@ -616,7 +624,7 @@ const DocxBuilder = (() => {
   }
   const image = (rid = "rIdImg", id = 1, cx = 469265, cy = 628650) => `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Imagen ${id}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="img${id}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
 
-  function documentXml({info, titulo, lista, apellido, preguntas, respuestas, fotos, puntos, total, puntaje, entregado, fmt}){
+  function documentXml({info, titulo, lista, apellido, preguntas, respuestas, fotos, puntos, comentarios, total, puntaje, entregado, fmt}){
     const L = "abcdefghij", body = [];
     // Encabezado: escudo + nombre de la universidad
     body.push(table([[
@@ -656,7 +664,8 @@ const DocxBuilder = (() => {
          cell(para(run("Puntaje asignado", {b:true}), {jc:"center"}), 1604)],
         [cell(resp.split(/\n+/).map(t => para(run(t), {after:60})), 4300, {v:"top"}),
          cell(para(run(fmt(q.puntos ?? 1)), {jc:"center"}), 1600),
-         cell(para(run(asg, {b:true}), {jc:"center"}), 1604)]
+         cell(para(run(asg, {b:true}), {jc:"center"}), 1604)],
+        ...(String(comentarios?.[i] || "").trim() ? [[cell(String(comentarios[i]).trim().split(/\n+/).map((t, k) => para(k ? run(t) : [run("Comentario del docente: ", {b:true, color:"84100A"}), run(t)], {after:40})), 7504, {span:3, shade:"F7EFEE", v:"top"})]] : [])
       ], [4300,1600,1604]));
       const fs = fotos?.[i] || [];
       if (fs.length) {
@@ -1234,7 +1243,7 @@ function renderTests(){
   if (session.rol === "profe"){
     const ss = salones();
     if (secOpen && !ss.includes(secOpen)) secOpen = null;
-    $("secNav").hidden = !secOpen;
+    $("secNav").hidden = !secOpen; if (!secOpen) $("secPdfRow").hidden = true;
     $("listHint").textContent = !secOpen && ss.length ? "Elige una sección para ver sus evaluaciones." : "";
     if (!secOpen) {
       $("tList").innerHTML = ss.length ? `<div class="secgrid">${ss.map(s => {
@@ -1248,6 +1257,10 @@ function renderTests(){
         : '<div class="empty">Aún no tienes secciones. Cuando crees una evaluación para una sección, aparecerá aquí.</div>';
     } else {
       $("secTitle").textContent = salonName(secOpen);
+      const sp = secPending(secOpen);
+      $("secPdfRow").hidden = false;
+      $("secPdfRow").querySelector("[data-pdf]").disabled = sp > 0;
+      $("secPdfMsg").textContent = sp > 0 ? `Disponible cuando califiques todo: ${sp === 1 ? "falta 1 entrega" : `faltan ${sp} entregas`} por calificar.` : "";
       $("tList").innerHTML = tests.filter(t => salonOf(t) === secOpen).map(testCard).join("");
     }
   } else {
@@ -1316,10 +1329,113 @@ function estadoChip(r){
   return resTest && Date.now() > resTest.cierre ? '<span class="chip off">NO ENTREGÓ</span>' : '<span class="chip">RINDIENDO</span>';
 }
 function nextPending(r){ const p = pendingRows(r?.id); return p.find(x => x.lista > (r?.lista ?? -1)) || p[0] || null; }
+const asciiName = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7E]/g, "").replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim();
+/* ---------- Tabla de resultados de la sección (PDF) ---------- */
+function secPending(sec){
+  const ids = new Set(tests.filter(t => salonOf(t) === sec).map(t => t.id));
+  const pend = allRes.filter(r => ids.has(r.testId) && r.estado === "entregada").length;
+  const live = resRows.filter(r => ids.has(r.testId) && r.estado === "entregada" && !allRes.some(a => a.id === r.id)).length;
+  return pend + live;
+}
+let sealData = null;
+async function loadSeal(){
+  if (sealData) return sealData;
+  const blob = await (await fetch("img/escudo-uni.png")).blob();
+  sealData = await new Promise((ok, ko) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = ko; fr.readAsDataURL(blob); });
+  return sealData;
+}
+async function sectionPdf(sec){
+  const ts = tests.filter(t => salonOf(t) === sec).sort((a, b) => a.inicio - b.inicio);
+  const ids = new Set(ts.map(t => t.id)), rs = allRes.filter(r => ids.has(r.testId));
+  const people = new Map();
+  rs.forEach(r => { const s = people.get(r.lista); if (!s || (r.fecha || 0) > s.fecha) people.set(r.lista, {lista: r.lista, apellido: r.apellido, fecha: r.fecha || 0}); });
+  const rows = [...people.values()].sort((a, b) => a.lista - b.lista);
+  const cellOf = (t, lista) => {
+    const r = rs.find(x => x.testId === t.id && x.lista === lista);
+    if (!r) return "—";
+    if (r.estado === "corregida") return fmt(r.puntaje);
+    if (r.estado === "anulada") return "0 (IA)";
+    if (r.estado === "inasistencia") return "0 (Inas.)";
+    if (r.estado === "en_curso") return Date.now() > t.cierre ? "0 (NE)" : "En curso";
+    return "Pendiente";
+  };
+  const {jsPDF} = window.jspdf;
+  const land = ts.length > 4, doc = new jsPDF({orientation: land ? "landscape" : "portrait", unit: "mm", format: "a4"});
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 15;
+  const MAROON = [132, 15, 8];
+  try { doc.addImage(await loadSeal(), "PNG", M, 11, 15, 18.2); } catch {}
+  doc.setTextColor(30, 26, 26); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  doc.text("UNIVERSIDAD NACIONAL DE INGENIERÍA", W / 2, 16.5, {align: "center"});
+  doc.setFontSize(10.5); doc.text("Facultad de Ingeniería Industrial y de Sistemas", W / 2, 22, {align: "center"});
+  doc.setFont("helvetica", "normal"); doc.setTextColor(...MAROON); doc.text("Test de Laboratorios UNI-FIIS", W / 2, 27.5, {align: "center"});
+  doc.setDrawColor(...MAROON); doc.setLineWidth(0.6); doc.line(M, 32.5, W - M, 32.5);
+  doc.setTextColor(30, 26, 26); doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+  doc.text(`Tabla de resultados · Sección ${sec}`, M, 41);
+  const info = [...ts].reverse().find(t => t.doc && (t.doc.curso || t.doc.docente))?.doc || {};
+  const line = [info.curso && "Curso: " + info.curso, info.codigo && "Código: " + info.codigo, info.docente && "Docente: " + info.docente, info.ciclo && "Ciclo: " + info.ciclo].filter(Boolean).join("   ·   ");
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(95, 88, 86);
+  let y = 47;
+  if (line) { doc.text(line, M, y); y += 5.5; }
+  doc.text(`${cnt(ts.length, "test", "tests")} · ${cnt(rows.length, "alumno", "alumnos")}`, M, y); y += 6;
+  // Columnas
+  const usable = W - 2 * M, wN = 18, wA = land ? 62 : 58;
+  const wT = Math.max(16, (usable - wN - wA) / Math.max(1, ts.length));
+  const cols = [{h: "N° de lista", w: wN, a: "center"}, {h: "Apellido paterno", w: wA, a: "left"},
+    ...ts.map((t, i) => ({h: `${t.titulo} (sobre ${fmt(totalOf(t))})`, w: wT, a: "center"}))];
+  const fsHead = ts.length > 8 ? 7 : 8.5, fsBody = ts.length > 8 ? 8.5 : 10;
+  doc.setFontSize(fsHead); doc.setFont("helvetica", "bold");
+  const headLines = cols.map(c => doc.splitTextToSize(c.h, c.w - 3).slice(0, 4));
+  const headH = Math.max(...headLines.map(l => l.length)) * (fsHead * 0.42) + 4.5;
+  const rowH = fsBody * 0.55 + 3.2;
+  const drawHead = () => {
+    let x = M; doc.setFillColor(...MAROON); doc.rect(M, y, usable, headH, "F");
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(fsHead);
+    cols.forEach((c, i) => {
+      const tx = c.a === "center" ? x + c.w / 2 : x + 2;
+      doc.text(headLines[i], tx, y + 3.8, {align: c.a === "center" ? "center" : "left", baseline: "top", lineHeightFactor: 1.15});
+      x += c.w;
+    });
+    y += headH;
+  };
+  drawHead();
+  doc.setFont("helvetica", "normal"); doc.setFontSize(fsBody);
+  rows.forEach((s, ri) => {
+    if (y + rowH > H - 18) { doc.addPage(); y = 18; drawHead(); doc.setFont("helvetica", "normal"); doc.setFontSize(fsBody); }
+    if (ri % 2) { doc.setFillColor(247, 243, 242); doc.rect(M, y, usable, rowH, "F"); }
+    doc.setDrawColor(222, 214, 212); doc.setLineWidth(0.2); doc.line(M, y + rowH, W - M, y + rowH);
+    const vals = [String(s.lista), s.apellido, ...ts.map(t => cellOf(t, s.lista))];
+    let x = M;
+    vals.forEach((v, i) => {
+      const c = cols[i], txt = doc.splitTextToSize(String(v), c.w - 3)[0];
+      doc.setTextColor(...(/\((IA|Inas\.|NE)\)/.test(v) ? [176, 40, 30] : [30, 26, 26]));
+      doc.text(txt, c.a === "center" ? x + c.w / 2 : x + 2, y + rowH / 2, {align: c.a === "center" ? "center" : "left", baseline: "middle"});
+      x += c.w;
+    });
+    y += rowH;
+  });
+  if (!rows.length) { doc.setTextColor(95, 88, 86); doc.text("Todavía no hay entregas en esta sección.", M, y + 7); y += 10; }
+  if (y + 14 > H - 14) { doc.addPage(); y = 18; }
+  doc.setFontSize(8.5); doc.setTextColor(95, 88, 86);
+  doc.text("IA: anulada por sospecha de uso de IA   ·   Inas.: anulada por inasistencia   ·   NE: no entregó   ·   —: no rindió ese test", M, y + 7);
+  const n = doc.getNumberOfPages(), stamp = "Generado el " + fmtDate(Date.now());
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(130, 122, 120); doc.text(stamp, M, H - 8); doc.text(`Página ${i} de ${n}`, W - M, H - 8, {align: "right"}); }
+  doc.save(asciiName(`Resultados - Seccion ${sec}.pdf`));
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-pdf]"); if (!b || b.disabled) return;
+  const sec = secOpen || (resTest && salonOf(resTest)); if (!sec) return;
+  if (!window.jspdf) { toast("No se pudo cargar el generador de PDF. Revisa tu internet y recarga la página.", "info"); return; }
+  b.disabled = true; const txt = b.textContent; b.textContent = "Preparando PDF…";
+  try { await sectionPdf(sec); toast("Tabla de resultados descargada."); }
+  catch (er) { toast("No se pudo crear el PDF: " + (er?.message || "error"), "info"); }
+  finally { b.disabled = false; b.textContent = txt; }
+});
+
 function renderResProgress(){
   const gradable = resRows.filter(r => r.estado === "entregada" || r.estado === "corregida");
   const n = gradable.length, g = gradable.filter(r => r.estado === "corregida").length, anul = resRows.filter(r => r.estado === "anulada").length, ina = resRows.filter(r => r.estado === "inasistencia").length;
   $("resProg").hidden = !n || g === n; $("resDone").hidden = !n || g !== n;
+  $("resDoneSec").hidden = !resTest || secPending(salonOf(resTest)) > 0;
   $("resProgText").textContent = `Calificadas ${g} de ${n}` + (anul ? ` · ${cnt(anul, "con sospecha de IA", "con sospecha de IA")}` : "") + (ina ? ` · ${cnt(ina, "inasistencia", "inasistencias")}` : "");
   $("resProgBar").style.width = (n ? 100*g/n : 0) + "%";
   $("resStart").hidden = !!revDoc;
@@ -1357,6 +1473,7 @@ async function openRow(id){
         <label class="ptsin">de ${fmt(ptsOf(q))}<input type="text" inputmode="decimal" data-rp="${i}" value="${r.puntos ? inFmt(r.puntos[i] ?? 0) : ""}" placeholder="0" aria-label="Puntos asignados en la pregunta ${i+1}"></label></div>
       <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div>
       <div class="photos" data-ph="${i}"></div>
+      <label class="comment">Comentario para el alumno (opcional)<textarea data-rc="${i}" rows="2" placeholder="Ej: Buen razonamiento, pero faltó indicar las unidades.">${esc(r.comentarios?.[i] || "")}</textarea></label>
     </div></li>`; }).join("");
   revTotal(); renderResProgress();
   const locked = r.estado === "anulada" || r.estado === "en_curso" || r.estado === "inasistencia";
@@ -1370,7 +1487,7 @@ async function openRow(id){
   $("revReopen").hidden = !(r.estado === "anulada" || r.estado === "en_curso");
   $("revAbsent").hidden = r.estado === "inasistencia"; $("revUnabsent").hidden = r.estado !== "inasistencia"; $("absentConfirm").hidden = true;
   $("revClear").hidden = r.estado !== "anulada"; $("clearConfirm").hidden = true;
-  $("revList").querySelectorAll("[data-rp]").forEach(x => x.disabled = locked);
+  $("revList").querySelectorAll("[data-rp], [data-rc]").forEach(x => x.disabled = locked);
   $("revSaveRow").hidden = locked; $("revTotalBar").hidden = locked; $("reopenBox").hidden = false; $("reopenConfirm").hidden = true;
   if (locked) $("revMsg").textContent = "";
   $("revBox").hidden = false; $("revBox").scrollIntoView({behavior:"smooth", block:"start"});
@@ -1390,6 +1507,7 @@ function revTotal(){
   $("revTotal").textContent = v.some(x => x === null) ? "Revisa los valores en rojo" : `${fmt(v.reduce((s,x)=>s+x,0))} / ${fmt(revDoc.r.total)}`;
 }
 $("revList").addEventListener("input", e => {
+  if (e.target.dataset.rc !== undefined) { revDirty = true; return; }
   if (!e.target.dataset.rp) return;
   revDirty = true;
   const v = e.target.value.trim() === "" ? 0 : parseNum(e.target.value), max = ptsOf(revDoc.r.preguntas[+e.target.dataset.rp]);
@@ -1405,8 +1523,9 @@ async function saveGrade(advance){
   $("revSave").disabled = true;
   try {
     const puntaje = r2(v.reduce((s,x)=>s+x,0));
-    await db.doc("resultados/"+r.id).update({puntos:v, puntaje, estado:"corregida", corregido:Date.now()});
-    Object.assign(r, {puntos:v, puntaje, estado:"corregida"});
+    const comentarios = [...document.querySelectorAll("#revList [data-rc]")].map(x => x.value.trim());
+    await db.doc("resultados/"+r.id).update({puntos:v, puntaje, comentarios, estado:"corregida", corregido:Date.now()});
+    Object.assign(r, {puntos:v, puntaje, comentarios, estado:"corregida"});
     revDirty = false;
     const next = nextPending(r);
     toast(`Nota guardada: N° ${r.lista} · ${r.apellido}, ${fmt(puntaje)} de ${fmt(r.total)}.` + (advance && next ? " Siguiente entrega…" : ""));
@@ -1767,7 +1886,7 @@ function showDone(r, repeated, auto){
   $("doneList").innerHTML = (r.preguntas||[]).map((q,i) => {
     const ans = String(r.respuestas?.[i] ?? "").trim();
     return `<li><div class="qbody"><div class="qhead"><div class="qtext">${esc(q.pregunta)}</div><span class="pts">${graded ? fmt(r.puntos?.[i] ?? 0) : "–"} / ${fmt(ptsOf(q))}</span></div>
-      <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div><div class="photos" data-dph="${i}"></div></div></li>`; }).join("");
+      <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div><div class="photos" data-dph="${i}"></div>${graded && r.comentarios?.[i] ? `<div class="teacher-note"><b>Comentario del docente:</b> ${esc(r.comentarios[i])}</div>` : ""}</div></li>`; }).join("");
   window.scrollTo({top:0});
   if ((r.fotos||[]).some(n => n > 0)) fotosOf(r.id).then(f => { if (shown?.id !== r.id) return; f.forEach((l,i) => { const el = document.querySelector(`[data-dph="${i}"]`); if (el && l) el.innerHTML = thumbs(l, false); }); }).catch(()=>{});
 }
@@ -1784,8 +1903,8 @@ async function downloadDocx(r, btn){
     const bytes = await DocxBuilder.build(JSZip, CREST, {
       info: {seccion: cleanSalon(r.salon), curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:r.doc?.docente||"", ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
       titulo:r.titulo, lista:r.lista, apellido:r.apellido, preguntas:r.preguntas||[], respuestas:r.respuestas||[], fotos,
-      puntos: r.estado === "corregida" ? r.puntos : null, total:r.total, puntaje:r.puntaje||0, entregado: fmtDate(r.fecha), fmt});
-    const name = `${r.titulo} - ${String(r.lista).padStart(2,"0")} ${r.apellido}.docx`.replace(/[\\/:*?"<>|]/g, "");
+      puntos: r.estado === "corregida" ? r.puntos : null, comentarios: r.estado === "corregida" ? r.comentarios : null, total:r.total, puntaje:r.puntaje||0, entregado: fmtDate(r.fecha), fmt});
+    const name = asciiName(`${r.titulo} - ${String(r.lista).padStart(2,"0")} ${r.apellido}.docx`);
     await downloads.save({filename:name, data:bytes});
     say("");
     if (!msg) $("dbNote").hidden = true;
