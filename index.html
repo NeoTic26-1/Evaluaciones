@@ -180,7 +180,7 @@ tbody tr.sus:hover td,tbody tr.sus.sel td{background:#f8d6d2}
 #aTake .qtext{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .stamp.bad{background:var(--red-soft);color:var(--red)}
 .toast.info{background:var(--fg);box-shadow:0 10px 30px -10px rgba(43,52,66,.5)}
-#inSalon,#inSalonA,[data-sal]{text-transform:uppercase}
+#inSalon,#inSalonA,[data-sal]{text-transform:uppercase;text-align:center;font-weight:700;font-size:20px}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
 .pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
@@ -233,7 +233,7 @@ input[type=datetime-local]{min-height:50px}
       <div class="row">
         <label style="flex:0 1 150px">N° de lista<input id="inLista" type="number" min="1" max="99" inputmode="numeric" required placeholder="14"></label>
         <label>Apellido paterno<input id="inApellido" type="text" required autocomplete="family-name" placeholder="González"></label>
-        <label style="flex:0 1 150px">Sección<input id="inSalonA" type="text" required list="salonList" autocomplete="off" placeholder="A"></label>
+        <label style="flex:0 1 150px">Sección<input id="inSalonA" type="text" required list="salonList" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="A"></label>
       </div>
       <button type="submit" style="align-self:flex-start">Entrar</button>
     </form>
@@ -261,7 +261,7 @@ input[type=datetime-local]{min-height:50px}
         </div></div>
         <div class="row">
           <label>Título<input id="inTitulo" type="text" placeholder="Ej: Laboratorio de densidad"></label>
-          <label style="flex:0 1 200px">Sección<input id="inSalon" type="text" list="salonList" placeholder="Ej: A"></label>
+          <label style="flex:0 1 200px">Sección<input id="inSalon" type="text" list="salonList" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="A"></label>
         </div>
         <datalist id="salonList"></datalist>
         <div class="box">
@@ -757,7 +757,12 @@ const salonOf = t => cleanSalon(t?.salon) || "Sin sección";
 const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
 const sameSec = (a, b) => secKey(a) === secKey(b);
 const salonName = s => s === "Sin sección" ? s : "Sección " + s;
-const cleanSalon = s => String(s || "").trim().replace(/^(sal[oó]n|secci[oó]n)\s*/i, "").replace(/\s+/g, " ").toLocaleUpperCase("es");
+const cleanSalon = s => String(s || "").trim().replace(/^(sal[oó]n|secci[oó]n)\s*/i, "").replace(/[^a-zA-ZñÑ]/g, "").slice(-1).toLocaleUpperCase("es");
+document.addEventListener("input", e => {
+  if (!e.target.matches?.("#inSalon, #inSalonA, [data-sal]")) return;
+  const v = e.target.value.replace(/[^a-zA-ZñÑ]/g, "").slice(-1).toLocaleUpperCase("es");
+  if (v !== e.target.value) e.target.value = v;
+});
 let secOpen = null, allRes = [], unsubAll = null;
 const cnt = (n, s, p) => n === 1 ? "1 " + s : n + " " + p;
 function stats(ids){
@@ -838,7 +843,7 @@ $("fAlumno").onsubmit = e => {
   if (!lista || lista < 1) return loginErr("Escribe tu número de lista (un número desde 1).");
   if (apellido.length < 2) return loginErr("Escribe tu apellido paterno.");
   const typed = cleanSalon($("inSalonA").value);
-  if (!typed) return loginErr("Escribe tu sección.");
+  if (!typed) return loginErr("Escribe tu sección (una letra, por ejemplo A).");
   const salon = salones().find(s => sameSec(s, typed)) || typed;
   if (!db) return loginErr("Sin conexión a la base de datos. Revisa tu internet y vuelve a cargar la página.");
   session = {rol:"alumno", lista, apellido, salon};
@@ -928,7 +933,7 @@ $("inInicio").addEventListener("input", updateDur); $("inCierre").addEventListen
 function checkStep1(){
   const inicio = new Date($("inInicio").value).getTime(), cierre = new Date($("inCierre").value).getTime();
   if (!$("inTitulo").value.trim()) return "Escribe el título de la evaluación.";
-  if (!cleanSalon($("inSalon").value)) return "Escribe la sección a la que va dirigida (por ejemplo A o B).";
+  if (!cleanSalon($("inSalon").value)) return "Escribe la sección a la que va dirigida: una letra, por ejemplo A.";
   if (!inicio || !cierre) return "Indica cuándo empieza y cuándo termina.";
   if (cierre <= inicio) return "La hora de término debe ser posterior a la de inicio.";
   if (cierre <= Date.now()) return "La hora de término ya pasó. Elige una hora futura.";
@@ -1172,7 +1177,7 @@ function testCard(t){ const st = statusOf(t), k = stats(new Set([t.id])); return
           <div class="row">
             <label>Empieza<input type="datetime-local" data-ini value="${toLocalInput(t.inicio)}"></label>
             <label>Termina<input type="datetime-local" data-fin value="${toLocalInput(t.cierre)}"></label>
-            <label style="flex:0 1 150px">Sección<input type="text" data-sal list="salonList" value="${esc(t.salon || "")}"></label>
+            <label style="flex:0 1 150px">Sección<input type="text" data-sal list="salonList" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(salonOf(t) === "Sin sección" ? "" : salonOf(t))}"></label>
             <button class="small" data-act="schedsave" type="button">Guardar</button>
           </div>
           <span class="err" data-schederr hidden></span>
@@ -1243,7 +1248,7 @@ $("tList").addEventListener("click", async e => {
     const er = box.querySelector("[data-schederr]");
     const sal = cleanSalon(box.querySelector("[data-sal]").value);
     if (!ini || !fin || fin <= ini) { er.textContent = "La hora de término debe ser posterior a la de inicio."; er.hidden = false; return; }
-    if (!sal) { er.textContent = "Escribe la sección."; er.hidden = false; return; }
+    if (!sal) { er.textContent = "Escribe la sección: una letra, por ejemplo A."; er.hidden = false; return; }
     try { await db.doc("tests/"+id).update({inicio:ini, cierre:fin, salon:sal}); toast("Cambios guardados."); } catch (x) { er.textContent = "No se pudo guardar: " + x.message; er.hidden = false; }
   }
   if (act === "res") guard(() => showResults(t));
