@@ -169,6 +169,7 @@ tbody tr{cursor:pointer} tbody tr:hover td,tbody tr.sel td{background:var(--pri-
 #aTake .qtext{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .stamp.bad{background:var(--red-soft);color:var(--red)}
 .toast.info{background:var(--fg);box-shadow:0 10px 30px -10px rgba(43,52,66,.5)}
+#inSalon,#inSalonA,[data-sal]{text-transform:uppercase}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
 .pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
@@ -569,7 +570,7 @@ const DocxBuilder = (() => {
     const val = t => para(run(t, {b:true, sz:18}));
     body.push(table([
       [cell(lab("Curso"),1300), cell(val(info.curso),3900), cell(lab("Ciclo"),1100), cell(val(info.ciclo),1204)],
-      [cell(lab("Código"),1300), cell(val(info.codigo),3900), cell(lab(""),1100), cell(val(""),1204)],
+      [cell(lab("Código"),1300), cell(val(info.codigo),3900), cell(lab(info.seccion ? "Sección" : ""),1100), cell(val(info.seccion || ""),1204)],
       [cell(lab("Docente"),1300), cell(val(info.docente),3900), cell(lab("Fecha"),1100), cell(val(info.fecha),1204)]
     ], [1300,3900,1100,1204], {center:true}));
     // Título
@@ -727,11 +728,11 @@ async function autoPurge(){
   for (const t of old) { try { await deleteEvaluation(t.id); n++; } catch {} }
   if (n) toast((n > 1 ? `Se borraron automáticamente ${n} evaluaciones` : "Se borró automáticamente 1 evaluación") + ` con más de ${RET_DAYS} días de cerrada, junto con sus entregas y fotos.`, "info");
 }
-const salonOf = t => String(t?.salon || "").trim() || "Sin sección";
+const salonOf = t => cleanSalon(t?.salon) || "Sin sección";
 const secKey = s => norm(cleanSalon(s)).replace(/\s+/g, "");
 const sameSec = (a, b) => secKey(a) === secKey(b);
 const salonName = s => s === "Sin sección" ? s : "Sección " + s;
-const cleanSalon = s => String(s || "").trim().replace(/^(sal[oó]n|secci[oó]n)\s*/i, "");
+const cleanSalon = s => String(s || "").trim().replace(/^(sal[oó]n|secci[oó]n)\s*/i, "").replace(/\s+/g, " ").toLocaleUpperCase("es");
 let salonSel = "todos";
 function salones(){ return [...new Set(tests.map(salonOf))].sort((a,b) => a.localeCompare(b, "es", {numeric:true})); }
 function fillSalones(){
@@ -1547,7 +1548,7 @@ async function downloadDocx(r, btn){
   try {
     const fotos = (r.fotos||[]).some(n => n > 0) ? await fotosOf(r.id) : [];
     const bytes = await DocxBuilder.build(JSZip, CREST, {
-      info: {curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:r.doc?.docente||"", ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
+      info: {seccion: cleanSalon(r.salon), curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:r.doc?.docente||"", ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
       titulo:r.titulo, lista:r.lista, apellido:r.apellido, preguntas:r.preguntas||[], respuestas:r.respuestas||[], fotos,
       puntos: r.estado === "corregida" ? r.puntos : null, total:r.total, puntaje:r.puntaje||0, entregado: fmtDate(r.fecha), fmt});
     const name = `${r.titulo} - ${String(r.lista).padStart(2,"0")} ${r.apellido}.docx`.replace(/[\\/:*?"<>|]/g, "");
