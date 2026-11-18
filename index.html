@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Evaluaciones en línea</title>
-<meta name="description" content="Evaluaciones en línea: el docente crea y califica; los alumnos rinden y descargan su evaluación en Word.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233a6fd8'/%3E%3Cpath d='M18 33l9 9 19-21' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>Test de Laboratorios UNI-FIIS</title>
+<meta name="description" content="Test de Laboratorios UNI-FIIS: el docente crea y califica; los alumnos rinden y descargan su evaluación en Word.">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
@@ -17,9 +18,10 @@ img{max-width:100%}
 /* Layout: una columna clara y aireada; pestañas simples para el docente; un solo tema claro a pedido del usuario */
 :root{
   color-scheme:light;
-  --bg:#f5f7fb; --paper:#ffffff; --fg:#2b3442; --muted:#667085; --line:#e3e8ef; --line-strong:#cdd5e1;
-  --pri:#3a6fd8; --pri-hover:#2f60c4; --on-pri:#ffffff; --pri-soft:#eaf1fd;
-  --ok:#1f8f63; --ok-soft:#e5f6ee; --warn:#b7740c; --warn-soft:#fdf3e1; --red:#cf4438; --red-soft:#fdecea;
+  --bg:#f6f4f3; --paper:#ffffff; --fg:#2d2928; --muted:#6c6461; --line:#e9e3e1; --line-strong:#d4cbc8;
+  --pri:#8a1a12; --pri-hover:#6e140d; --on-pri:#ffffff; --pri-soft:#f6ebe9;
+  --uni:#84100a; --uni-deep:#5a0a06; --gold:#f2cfa0;
+  --ok:#1f8f63; --ok-soft:#e5f6ee; --warn:#b7740c; --warn-soft:#fdf3e1; --red:#d63a2a; --red-soft:#fde6e3;
   --f-head:"Lexend",system-ui,-apple-system,sans-serif;
   --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,sans-serif;
 }
@@ -37,7 +39,18 @@ p{margin:0}
 .small-text{font-size:16px}
 .num{font-variant-numeric:tabular-nums}
 
-header.top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:14px 18px;flex-wrap:wrap;padding:18px 22px;border-radius:18px;background:linear-gradient(135deg,var(--uni),var(--uni-deep));color:#fff;box-shadow:0 12px 28px -18px rgba(90,10,6,.7)}
+.brand-id{display:flex;align-items:center;gap:16px;min-width:0;flex:1 1 300px}
+.seal{flex:0 0 auto;width:74px;height:74px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 0 0 3px rgba(255,255,255,.22)}
+.seal img{width:57px;height:auto;display:block}
+header.top h1{color:#fff;font-size:clamp(22px,4.6vw,31px)}
+header.top h1 span{color:var(--gold);white-space:nowrap}
+.brand-sub{color:rgba(255,255,255,.82);font-size:15px;margin-top:4px;line-height:1.35}
+header.top .who{color:rgba(255,255,255,.9)}
+header.top .who .chip{background:rgba(255,255,255,.16);color:#fff}
+header.top #logout{background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}
+header.top #logout:hover:not(:disabled){background:rgba(255,255,255,.14);border-color:#fff}
+@media (max-width:480px){.seal{width:60px;height:60px}.seal img{width:47px}.brand-sub{font-size:14px}}
 .who{font-size:17px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
 .sheet{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,4vw,30px);display:flex;flex-direction:column;gap:20px;min-width:0}
@@ -129,7 +142,8 @@ td.num,th.num{text-align:right}
 tbody tr{cursor:pointer} tbody tr:hover td,tbody tr.sel td{background:var(--pri-soft)}
 tbody tr.sus td{background:var(--red-soft);color:var(--red)}
 tbody tr.sus:hover td,tbody tr.sus.sel td{background:#f8d6d2}
-.test.sus,.sheet.sus{border-color:var(--red);background:var(--red-soft)}
+.test.sus,.sheet.sus{border-color:var(--red);background:var(--red-soft);box-shadow:inset 5px 0 0 var(--red)}
+tbody tr.sus td:first-child{box-shadow:inset 4px 0 0 var(--red)}
 .sheet.sus .stamp{background:var(--paper)}
 .note.bad{background:var(--red-soft)}
 .secgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
@@ -203,7 +217,13 @@ input[type=datetime-local]{min-height:50px}
 
 <div class="wrap">
   <header class="top">
-    <h1>Evaluaciones en línea</h1>
+    <div class="brand-id">
+      <span class="seal"><img src="img/escudo-uni.png" alt="Escudo de la Universidad Nacional de Ingeniería" width="50" height="61"></span>
+      <div>
+        <h1>Test de Laboratorios <span>UNI-FIIS</span></h1>
+        <p class="brand-sub">Universidad Nacional de Ingeniería · Facultad de Ingeniería Industrial y de Sistemas</p>
+      </div>
+    </div>
     <div class="who" id="who" hidden>
       <span id="whoText"></span>
       <button class="ghost small" id="logout" type="button">Salir</button>
