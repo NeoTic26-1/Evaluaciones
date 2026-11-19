@@ -503,10 +503,9 @@ input[type=datetime-local]{min-height:50px}
           <ul class="rulelist">
             <li><b>Sales de la evaluación más de 5 segundos</b> (otra pestaña, app o ventana, minimizar o apagar la pantalla).</li>
             <li><b>Usas pantalla dividida</b> o achicas la ventana.</li>
-            <li><b>Copias, cortas o arrastras texto</b>, o se pega de golpe un texto largo.</li>
             <li><b>Cierras o recargas la página.</b></li>
           </ul>
-          <p class="small-text">Pegar (Ctrl+V) está desactivado. Si vuelves antes de 5 segundos, solo se pausa.</p>
+          <p class="small-text">Copiar, cortar y pegar están desactivados. Si vuelves antes de 5 segundos, solo se pausa.</p>
         </div>
         <div class="box">
           <p><b>Sí puedes</b> subir fotos de tu desarrollo: tienes 3 minutos para volver. Todo se guarda solo, y si tu equipo se apaga se entrega lo que llevabas.</p>
@@ -1830,16 +1829,17 @@ window.addEventListener("blur", () => { if (guardOn && !grace && !document.hidde
 window.addEventListener("focus", () => { cancelBlur(); if (grace) endGrace(1500); });
 window.addEventListener("pagehide", () => { if (guardOn && current) { try { localStorage.setItem(flagKey(resId(current)), ABANDON); } catch {} } });
 window.addEventListener("beforeunload", e => { if (guardOn) { e.preventDefault(); e.returnValue = ""; } });
-["copy","cut"].forEach(ev => document.addEventListener(ev, e => { if (!guardOn) return; e.preventDefault(); annul("Copió o cortó texto durante la evaluación."); }));
-const PASTE_OFF = "Pegar (Ctrl+V) está desactivado durante la evaluación. Escribe tu respuesta.";
+const CLIP_OFF = "Copiar, cortar y pegar están desactivados durante la evaluación.";
+["copy","cut"].forEach(ev => document.addEventListener(ev, e => { if (!guardOn) return; e.preventDefault(); toast(CLIP_OFF, "info"); }));
+const PASTE_OFF = "Pegar está desactivado durante la evaluación. Escribe tu respuesta.";
 document.addEventListener("paste", e => { if (!guardOn) return; e.preventDefault(); e.stopPropagation(); toast(PASTE_OFF, "info"); }, true);
 document.addEventListener("dragover", e => { if (guardOn) e.preventDefault(); });
-document.addEventListener("drop", e => { if (!guardOn) return; e.preventDefault(); annul("Arrastró texto o archivos hacia la evaluación."); });
+document.addEventListener("drop", e => { if (!guardOn) return; e.preventDefault(); toast(PASTE_OFF, "info"); });
 document.addEventListener("beforeinput", e => {
   if (!guardOn) return;
   if (/^insertFrom(Paste|Yank)/.test(e.inputType)) { e.preventDefault(); toast(PASTE_OFF, "info"); }
-  else if (e.inputType === "insertFromDrop") { e.preventDefault(); annul("Arrastró texto o archivos hacia la evaluación."); }
-  else if (e.inputType === "insertText" && (e.data || "").length > LONG_INSERT) { e.preventDefault(); annul("Insertó de golpe un texto largo (posible texto copiado o generado)."); }
+  else if (e.inputType === "insertFromDrop") { e.preventDefault(); toast(PASTE_OFF, "info"); }
+  else if (e.inputType === "insertText" && (e.data || "").length > LONG_INSERT) { e.preventDefault(); toast(PASTE_OFF, "info"); }
 });
 document.addEventListener("contextmenu", e => { if (guardOn && (!isTouch || !e.target.closest("textarea"))) e.preventDefault(); });
 document.addEventListener("keydown", e => {
