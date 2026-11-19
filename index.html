@@ -202,6 +202,9 @@ tbody tr.ina td:first-child{box-shadow:inset 4px 0 0 #3f3a39}
 .teacher-note{padding:12px 14px;border-radius:10px;background:var(--pri-soft);border-left:4px solid var(--pri);white-space:pre-wrap;overflow-wrap:anywhere}
 input[readonly]:not(#inSalonA){background:var(--bg);color:var(--muted);cursor:default}
 .cause{font-size:13px;font-weight:700;color:var(--red);white-space:normal;margin-top:4px;line-height:1.3}
+.qimgs{display:flex;flex-direction:column;gap:10px}
+.qimgs:empty{display:none}
+.qimgs img{max-width:100%;width:auto;max-height:420px;object-fit:contain;align-self:flex-start;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:zoom-in}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
 .pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
@@ -595,13 +598,14 @@ const DocxBuilder = (() => {
   function cell(content, w, o = {}){
     const p = [`<w:tcW w:w="${w}" w:type="dxa"/>`];
     if (o.span) p.push(`<w:gridSpan w:val="${o.span}"/>`);
+    if (o.bd) p.push(`<w:tcBorders>${Object.entries(o.bd).map(([s, v]) => `<w:${s} w:val="${v}" w:sz="${v === "nil" ? 0 : 6}" w:space="0" w:color="000000"/>`).join("")}</w:tcBorders>`);
     if (o.shade) p.push(`<w:shd w:val="clear" w:color="auto" w:fill="${o.shade}"/>`);
     p.push(`<w:vAlign w:val="${o.v || "center"}"/>`);
     return `<w:tc><w:tcPr>${p.join("")}</w:tcPr>${Array.isArray(content) ? content.join("") : content}</w:tc>`;
   }
   function table(rows, widths, o = {}){
     const b = o.noBorders ? "nil" : "single";
-    const borders = ["top","left","bottom","right","insideH","insideV"].map(s => `<w:${s} w:val="${b}" w:sz="4" w:space="0" w:color="000000"/>`).join("");
+    const borders = ["top","left","bottom","right","insideH","insideV"].map(s => `<w:${s} w:val="${b}" w:sz="4" w:space="0" w:color="${o.color || "000000"}"/>`).join("");
     const total = widths.reduce((a,c) => a + c, 0);
     return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>${o.center ? '<w:jc w:val="center"/>' : ""}<w:tblBorders>${borders}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="70" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar></w:tblPr>`
       + `<w:tblGrid>${widths.map(w => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>`
@@ -609,90 +613,87 @@ const DocxBuilder = (() => {
   }
   const image = (rid = "rIdImg", id = 1, cx = 469265, cy = 628650) => `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Imagen ${id}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="img${id}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
 
-  function documentXml({info, titulo, lista, apellido, preguntas, respuestas, fotos, puntos, comentarios, total, puntaje, entregado, fmt}){
-    const L = "abcdefghij", body = [];
-    // Encabezado: escudo + nombre de la universidad
+  function documentXml({info, titulo, lista, apellido, preguntas, qimgs, respuestas, fotos, puntos, comentarios, total, puntaje, entregado, fmt}){
+    const body = [], media = [], W = 9447, BLUE = "0000FF";
+    const addImage = (f, maxW = 4800000) => {
+      const n = media.length + 1, ext = /png/i.test(f.mime || "") ? "png" : "jpeg";
+      const cx = Math.min(maxW, Math.round((f.w || 400) * 9525)), cy = Math.round(cx * (f.h || 300) / (f.w || 400));
+      const lim = 6400800, k = cy > lim ? lim / cy : 1;
+      media.push({data: f.data, ext});
+      return para(image(`rIdF${n}`, n + 1, Math.round(cx * k), Math.round(cy * k)), {after: 80, ind: 360});
+    };
+    // Encabezado
     body.push(table([[
-      cell(para(image()), 1000),
+      cell(para(image()), 1100),
       cell([
         para(run("UNIVERSIDAD NACIONAL DE INGENIERÍA", {b:true, sz:28}), {jc:"center"}),
         para(run("Facultad de Ingeniería Industrial y de Sistemas", {b:true, sz:24}), {jc:"center"}),
-        para(run("DEPARTAMENTO DE CIENCIAS BÁSICAS", {b:true, sz:20}), {jc:"center"})
-      ], 6504)
-    ]], [1000, 6504], {noBorders:true, center:true}));
-    body.push(para("", {after:200}));
+        para(run("DEPARTAMENTO DE CIENCIAS BÁSICAS", {b:true, sz:24}), {jc:"center"})
+      ], W - 1100)
+    ]], [1100, W - 1100], {noBorders:true}));
+    body.push(para("", {after:120}));
     // Datos del curso
-    const lab = t => para(run(t, {b:true, sz:18}));
-    const val = t => para(run(t, {b:true, sz:18}));
+    const lab = t => para(run(t, {b:true, sz:20})), val = t => para(run(t || "", {b:true, sz:20}));
+    const cw = [1500, 4600, 1300, W - 7400];
     body.push(table([
-      [cell(lab("Curso"),1300), cell(val(info.curso),3900), cell(lab("Ciclo"),1100), cell(val(info.ciclo),1204)],
-      [cell(lab("Código"),1300), cell(val(info.codigo),3900), cell(lab(info.seccion ? "Sección" : ""),1100), cell(val(info.seccion || ""),1204)],
-      [cell(lab("Docente"),1300), cell(val(info.docente),3900), cell(lab("Fecha"),1100), cell(val(info.fecha),1204)]
-    ], [1300,3900,1100,1204], {center:true}));
+      [cell(lab("CURSO"), cw[0]), cell(val(info.curso), cw[1]), cell(lab("CICLO"), cw[2]), cell(val(info.ciclo), cw[3])],
+      [cell(lab("CODIGO"), cw[0]), cell(val(info.codigo), cw[1]), cell(lab(info.seccion ? "SECCIÓN" : ""), cw[2]), cell(val(info.seccion), cw[3])],
+      [cell(lab("DOCENTE"), cw[0]), cell(val(info.docente), cw[1]), cell(lab("FECHA"), cw[2]), cell(val(info.fecha), cw[3])]
+    ], cw));
     // Título
-    body.push(para([run("Evaluación: ", {b:true, sz:28}), run(titulo, {b:true, sz:28, color:CYAN})], {jc:"center", before:240, after:60}));
-    // Alumno
+    const nombre = String(titulo || "").replace(/^\s*test de laboratorio\s*:?\s*/i, "");
+    body.push(para([run("Test de Laboratorio:  ", {b:true, sz:28, color:BLUE}), run(nombre, {b:true, sz:28, color:BLUE})], {jc:"center", before:240, after:200}));
+    // Alumno: número, apellido y nota en el recuadro
+    const sw = [1500, 4300, W - 7200, 1400], noB = {top:"nil", left:"nil", right:"nil", bottom:"nil"};
+    const notaTxt = puntos ? `${fmt(puntaje)} / ${fmt(total)}` : "Pendiente";
     body.push(table([
-      [cell(para(run("# lista", {sz:16})), 900), cell(para(run("Apellido paterno", {sz:16})), 2800)],
-      [cell(para(run(String(lista), {sz:20})), 900), cell(para(run(apellido, {sz:20})), 2800)]
-    ], [900, 2800]));
-    body.push(para("", {after:200}));
+      [cell(para(run(String(lista), {b:true, sz:24}), {jc:"center"}), sw[0], {bd:{...noB, bottom:"dotted"}}),
+       cell(para(run(apellido, {b:true, sz:24})), sw[1], {bd:{...noB, bottom:"dotted"}}),
+       cell(para(""), sw[2], {bd:noB}),
+       cell(para(run(notaTxt, {b:true, sz:puntos ? 24 : 18}), {jc:"center", before:120, after:120}), sw[3], {bd:{top:"single", left:"single", right:"single", bottom:"single"}})],
+      [cell(para(run("# de lista", {sz:18})), sw[0], {bd:noB}), cell(para(run("Apellido paterno", {b:true, sz:18})), sw[1], {bd:noB}), cell(para(""), sw[2], {bd:noB}), cell(para(run("Nota", {sz:18}), {jc:"center"}), sw[3], {bd:noB})]
+    ], sw, {noBorders:true}));
+    body.push(para("", {after:160}));
     // Preguntas
-    const media = [];
     preguntas.forEach((q, i) => {
-      const resp = String(respuestas?.[i] ?? "").trim() || "Sin respuesta escrita.";
-      const asg = puntos ? fmt(puntos[i] ?? 0) : "Pendiente";
-      body.push(para([run(`${i+1}.-\t`), run(q.pregunta)], {before:200, after:120, ind:567, keep:true}));
-      body.push(table([
-        [cell(para(run("Respuesta del alumno", {b:true, color:CYAN}), {jc:"center"}), 4300),
-         cell(para(run("Puntaje de la pregunta", {b:true}), {jc:"center"}), 1600),
-         cell(para(run("Puntaje asignado", {b:true}), {jc:"center"}), 1604)],
-        [cell(resp.split(/\n+/).map(t => para(run(t), {after:60})), 4300, {v:"top"}),
-         cell(para(run(fmt(q.puntos ?? 1)), {jc:"center"}), 1600),
-         cell(para(run(asg, {b:true}), {jc:"center"}), 1604)],
-        ...(String(comentarios?.[i] || "").trim() ? [[cell(String(comentarios[i]).trim().split(/\n+/).map((t, k) => para(k ? run(t) : [run("Comentario del docente: ", {b:true, color:"84100A"}), run(t)], {after:40})), 7504, {span:3, shade:"F7EFEE", v:"top"})]] : [])
-      ], [4300,1600,1604]));
+      const lineas = String(q.pregunta || "").split(/\n+/);
+      const pts = `(${fmt(q.puntos ?? 1)}p)`;
+      lineas.forEach((t, k) => body.push(para(k === 0 ? [run(`${i + 1}.  `, {sz:24}), run(t + (lineas.length === 1 ? "  " + pts : ""), {sz:24})] : run(t + (k === lineas.length - 1 ? "  " + pts : ""), {sz:24}), {before: k === 0 ? 180 : 0, after: 60, ind: k === 0 ? 0 : 360, keep: true})));
+      (qimgs?.[i] || []).forEach(f => body.push(addImage(f)));
+      const resp = String(respuestas?.[i] ?? "").trim();
+      body.push(para(run("Respuesta:", {b:true, sz:20, color:"657C9C"}), {before:80, after:40, keep:true}));
+      body.push(table([[cell((resp || "Sin respuesta escrita.").split(/\n+/).map(t => para(run(t, {sz:22}), {after:40})), W - 200, {v:"top"})]], [W - 200], {color:"BFBFBF"}));
       const fs = fotos?.[i] || [];
       if (fs.length) {
-        body.push(para(run(`Evidencias del desarrollo (${fs.length} foto${fs.length>1?"s":""})`, {sz:16, color:"595959"}), {before:100, after:60, keep:true}));
-        fs.forEach(f => {
-          const n = media.length + 1, maxW = 4114800, cx = Math.min(maxW, Math.round(f.w * 9525)), cy = Math.round(cx * f.h / f.w);
-          const lim = 6400800, k = cy > lim ? lim / cy : 1;
-          media.push(f.data);
-          body.push(para(image(`rIdF${n}`, n + 1, Math.round(cx*k), Math.round(cy*k)), {after:80}));
-        });
+        body.push(para(run(`Desarrollo del alumno (${fs.length} foto${fs.length > 1 ? "s" : ""}):`, {sz:18, color:"595959"}), {before:80, after:40, keep:true}));
+        fs.forEach(f => body.push(addImage(f, 4114800)));
       }
+      body.push(para(run(`Puntaje: ${puntos ? fmt(puntos[i] ?? 0) : "pendiente"} de ${fmt(q.puntos ?? 1)}`, {b:true, sz:20}), {jc:"right", before:60, after:40}));
+      const com = String(comentarios?.[i] || "").trim();
+      if (com) body.push(table([[cell(com.split(/\n+/).map((t, k) => para(k ? run(t, {sz:20}) : [run("Comentario del docente: ", {b:true, sz:20, color:"84100A"}), run(t, {sz:20})], {after:40})), W - 200, {shade:"F7EFEE", v:"top"})]], [W - 200], {noBorders:true}));
     });
-    // Total
-    const pct = puntos && total ? Math.round(100*puntaje/total) + "%" : "Pendiente";
-    body.push(para(run("Resultado final", {b:true}), {before:360, after:120, keep:true}));
-    body.push(table([
-      [cell(para(run("Puntaje obtenido", {b:true, color:CYAN}), {jc:"center"}), 2500), cell(para(run("Puntaje máximo", {b:true}), {jc:"center"}), 2500), cell(para(run("Porcentaje", {b:true}), {jc:"center"}), 2504)],
-      [cell(para(run(puntos ? fmt(puntaje) : "Pendiente", {b:true, sz:24}), {jc:"center"}), 2500), cell(para(run(fmt(total), {sz:24}), {jc:"center"}), 2500), cell(para(run(pct, {sz:24}), {jc:"center"}), 2504)]
-    ], [2500,2500,2504], {cantSplit:true}));
-    body.push(para(run(puntos ? "Evaluación corregida por el docente." : "Evaluación entregada; el docente aún no asigna el puntaje.", {sz:16, color:"595959"}), {before:80}));
-    if (entregado) body.push(para(run("Entregada: " + entregado, {sz:16, color:"595959"})));
+    body.push(para(run((puntos ? "Evaluación calificada por el docente." : "Evaluación entregada; el docente aún no asigna el puntaje.") + (entregado ? "   ·   Entregada: " + entregado : ""), {sz:16, color:"595959"}), {before:120}));
 
     return {media, xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join("")}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`};
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join("")}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1276" w:right="758" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`};
   }
   const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:lang w:val="es-PE"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;
   const TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
   const RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
   const IMG = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  const DOC_RELS = n => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdImg" Type="${IMG}" Target="media/escudo.jpeg"/>${Array.from({length:n},(_,i)=>`<Relationship Id="rIdF${i+1}" Type="${IMG}" Target="media/f${i+1}.jpeg"/>`).join("")}</Relationships>`;
+  const DOC_RELS = media => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdImg" Type="${IMG}" Target="media/escudo.jpeg"/>${media.map((f, i) => `<Relationship Id="rIdF${i+1}" Type="${IMG}" Target="media/f${i+1}.${f.ext}"/>`).join("")}</Relationships>`;
 
   async function build(JSZipLib, crestBase64, data){
     const zip = new JSZipLib();
     zip.file("[Content_Types].xml", TYPES);
     zip.file("_rels/.rels", RELS);
     const doc = documentXml(data);
-    zip.file("word/_rels/document.xml.rels", DOC_RELS(doc.media.length));
-    doc.media.forEach((b64, i) => zip.file(`word/media/f${i+1}.jpeg`, b64, {base64:true}));
+    zip.file("word/_rels/document.xml.rels", DOC_RELS(doc.media));
+    doc.media.forEach((f, i) => zip.file(`word/media/f${i+1}.${f.ext}`, f.data, {base64:true}));
     zip.file("word/styles.xml", STYLES);
     zip.file("word/media/escudo.jpeg", crestBase64, {base64:true});
     zip.file("word/document.xml", doc.xml);
@@ -1072,7 +1073,17 @@ async function compress(file){
     return {data: out.split(",")[1], w, h};
   } finally { URL.revokeObjectURL(url); }
 }
-const imgSrc = f => "data:image/jpeg;base64," + f.data;
+const imgSrc = f => `data:${f.mime || "image/jpeg"};base64,` + f.data;
+const qImgCache = new Map();
+async function qImgsOf(testId){
+  if (!testId) return [];
+  if (!qImgCache.has(testId)) qImgCache.set(testId, fotosOf("pregunta:" + testId).catch(() => { qImgCache.delete(testId); return []; }));
+  return qImgCache.get(testId);
+}
+const qImgsHtml = list => (list || []).map((f, k) => `<img src="${imgSrc(f)}" alt="Imagen ${k + 1} de la pregunta" data-zoom>`).join("");
+function fillQImgs(testId, attr){
+  qImgsOf(testId).then(arr => arr.forEach((l, i) => { const el = document.querySelector(`[${attr}="${i}"]`); if (el && l) el.innerHTML = qImgsHtml(l); })).catch(() => {});
+}
 function thumbs(list, removable){
   return list.map((f,k) => `<div class="thumb"><img src="${imgSrc(f)}" alt="Foto ${k+1} del desarrollo" data-zoom>${removable ? `<button type="button" data-rm="${k}" aria-label="Quitar foto ${k+1}">Quitar</button>` : ""}</div>`).join("");
 }
@@ -1085,7 +1096,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("lightb
 async function fotosOf(resultId){
   const s = await db.collection("fotos").where("resultId","==",resultId).get();
   const out = [];
-  s.docs.map(d => d.data()).sort((a,b) => a.q - b.q || a.k - b.k).forEach(f => { (out[f.q] ||= []).push({data:f.data, w:f.w, h:f.h}); });
+  s.docs.map(d => d.data()).sort((a,b) => a.q - b.q || a.k - b.k).forEach(f => { (out[f.q] ||= []).push({data:f.data, w:f.w, h:f.h, mime:f.mime}); });
   return out;
 }
 
@@ -1096,20 +1107,73 @@ const drop = $("drop");
 drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) readDocx(f); });
 $("file").onchange = e => { const f = e.target.files[0]; if (f) readDocx(f); };
 
+let docParsed = null;
 async function readDocx(f){
   if (!/\.docx$/i.test(f.name)) { $("fileName").textContent = "Ese archivo no es .docx. En Word usa Guardar como → Documento de Word (.docx) y vuelve a subirlo."; return; }
-  $("fileName").textContent = "Leyendo " + f.name + "…";
+  $("fileName").textContent = "Leyendo " + f.name + "…"; $("genStatus").textContent = "";
   try {
-    const r = await mammoth.extractRawText({arrayBuffer: await f.arrayBuffer()});
-    docText = r.value.replace(/\n{3,}/g,"\n\n").trim();
+    const r = await mammoth.convertToHtml({arrayBuffer: await f.arrayBuffer()}, {convertImage: mammoth.images.imgElement(img => img.read("base64").then(b64 => ({src: `data:${img.contentType};base64,${b64}`})))});
+    docParsed = await parseDocHtml(r.value);
+    docText = new DOMParser().parseFromString(r.value, "text/html").body.textContent.trim();
     if (!docText) throw new Error("vacío");
-    $("fileName").textContent = `${f.name} · ${docText.split(/\s+/).length} palabras`;
-    if (!$("inTitulo").value.trim()) $("inTitulo").value = f.name.replace(/\.docx$/i,"");
-    $("genOpts").hidden = false;
-    $("inModo").value = "doc";
-    $("inCant").closest("label").hidden = $("inModo").value === "doc";
-    $("genStatus").textContent = "";
-  } catch { $("fileName").textContent = "No se pudo leer el archivo. Revisa que no esté dañado ni protegido con contraseña."; }
+    const nImg = docParsed.qs.reduce((s, q) => s + q.imgs.length, 0);
+    $("fileName").textContent = `${f.name} · ${docParsed.qs.length === 1 ? "1 pregunta" : docParsed.qs.length + " preguntas"}` + (nImg ? ` · ${nImg === 1 ? "1 imagen" : nImg + " imágenes"}` : "");
+    $("genOpts").hidden = false; $("inModo").value = "doc";
+    $("inCant").closest("label").hidden = true;
+  } catch { docParsed = null; $("fileName").textContent = "No se pudo leer el archivo. Revisa que no esté dañado ni protegido con contraseña."; }
+}
+// Lee el Word con el formato del laboratorio: tabla CURSO/CODIGO/CICLO/FECHA, título
+// «Test de Laboratorio: X» y preguntas numeradas (a mano o con la numeración de Word),
+// con su puntaje entre paréntesis y sus imágenes.
+async function parseDocHtml(html){
+  const dom = new DOMParser().parseFromString(html, "text/html");
+  const info = {}, raw = []; let q = null, titulo = "";
+  const clean = t => String(t || "").replace(/[ \t\u00a0]+/g, " ").trim();
+  const imgsOf = el => [...el.querySelectorAll("img")].map(i => i.getAttribute("src")).filter(s => /^data:image\//.test(s || ""));
+  const filler = t => !t || /^[.…_\-–\s]+$/.test(t) || /^#?\s*de lista\b/i.test(t);
+  for (const el of dom.body.children) {
+    if (el.tagName === "TABLE") {
+      const rows = [...el.querySelectorAll("tr")].map(tr => [...tr.children].map(td => clean(td.textContent)));
+      let isInfo = false;
+      rows.forEach(row => row.forEach((c, k) => {
+        const key = norm(c).replace(/[^a-z]/g, "");
+        if (["curso", "codigo", "ciclo", "fecha", "docente"].includes(key)) { isInfo = true; if (row[k + 1]) info[key] = row[k + 1]; }
+      }));
+      if (!isInfo && q) { q.lines.push(rows.map(r => r.filter(Boolean).join(" | ")).filter(Boolean).join("\n")); q.imgs.push(...imgsOf(el)); }
+      continue;
+    }
+    const items = /^(OL|UL)$/.test(el.tagName) ? [...el.children].filter(c => c.tagName === "LI").map(li => [li, true]) : [[el, false]];
+    for (const [e, li] of items) {
+      const text = clean(e.textContent), imgs = imgsOf(e);
+      if (!raw.length) {
+        const tm = text.match(/^test\s+de\s+laboratorio\s*:?\s*(.*)$/i);
+        if (tm) { titulo = clean(tm[1]); continue; }
+      }
+      const nm = text.match(/^(?:pregunta\s*)?(\d{1,2})\s*(?:\.-|[.)\-:])\s*(.+)$/i);
+      if (li || nm) { q = {lines: [nm ? nm[2] : text], imgs: [...imgs]}; raw.push(q); continue; }
+      if (!q) continue;
+      if (!filler(text)) q.lines.push(text);
+      q.imgs.push(...imgs);
+    }
+  }
+  const qs = [];
+  for (const r of raw) {
+    let text = r.lines.filter(Boolean).join("\n"), puntos = null;
+    const all = [...text.matchAll(/\(\s*(\d+(?:[.,]\d+)?)\s*(?:p|pts?|ptos?|puntos?)?\.?\s*\)/gi)];
+    if (all.length) { const last = all[all.length - 1]; puntos = parseNum(last[1]); text = text.slice(0, last.index) + text.slice(last.index + last[0].length); }
+    text = text.split("\n").map(l => l.replace(/\s{2,}/g, " ").trim()).filter(Boolean).join("\n");
+    const imgs = [];
+    for (const src of r.imgs) { try { imgs.push(await prepImg(src)); } catch {} }
+    if (text || imgs.length) qs.push({pregunta: text, puntos, imgs});
+  }
+  return {qs, info, titulo};
+}
+async function prepImg(src){
+  const mime = src.slice(5, src.indexOf(";")), data = src.slice(src.indexOf(",") + 1);
+  const img = await loadImg(src);
+  if (/^image\/(png|jpeg)$/.test(mime) && data.length < 700000) return {data, mime, w: img.naturalWidth, h: img.naturalHeight};
+  const c = await compress(await (await fetch(src)).blob());
+  return {...c, mime: "image/jpeg"};
 }
 const CALC = /(calcul|hall|determin|resuelv|resolver|obten|cu[aá]nto|problema|densidad de|masa de|valor de)/i;
 function parseDoc(t){
@@ -1130,10 +1194,18 @@ $("btnGen").onclick = async () => {
   const st = $("genStatus");
   const base = parseNum($("inPtsAll").value) ?? 2;
   if ($("inModo").value === "doc"){
-    const qs = parseDoc(docText);
-    if (!qs.length){ st.textContent = "No encontré preguntas numeradas en el documento. Revisa que cada pregunta empiece con su número (1.-, 2.-…) o escríbelas tú mismo."; return; }
-    draft = qs.map(q => ({...q, puntos: base}));
-    st.textContent = `Se leyeron ${qs.length} preguntas del documento.`;
+    const qs = docParsed?.qs || [];
+    if (!qs.length){ st.textContent = "No encontré preguntas numeradas en el documento. Revisa que cada pregunta empiece con su número (1., 2.…) o escríbelas tú mismo."; return; }
+    draft = qs.map(q => ({pregunta: q.pregunta, puntos: q.puntos ?? base, fotos: CALC.test(q.pregunta), imgs: q.imgs}));
+    const inf = docParsed.info, tomados = [];
+    if (docParsed.titulo) { $("inTitulo").value = docParsed.titulo; tomados.push("título"); }
+    if (inf.curso) { $("inCurso").value = inf.curso; tomados.push("curso"); }
+    if (inf.codigo) { $("inCodigo").value = inf.codigo; tomados.push("código"); }
+    if (inf.ciclo) { $("inCiclo").value = inf.ciclo; tomados.push("ciclo"); }
+    if (!$("step1Sum").hidden) showStep1(false);
+    const sinPts = qs.filter(q => q.puntos == null).length;
+    st.textContent = `Se leyeron ${qs.length === 1 ? "1 pregunta" : qs.length + " preguntas"} del documento` + (tomados.length ? `, y se tomaron del Word: ${tomados.join(", ")}` : "") + "."
+      + (sinPts ? ` ${sinPts === 1 ? "Una pregunta no tenía" : sinPts + " preguntas no tenían"} puntaje entre paréntesis: revísalo.` : "");
     openEditor(); return;
   }
   if (!sample){ st.textContent = "La generación con Claude no está disponible en esta vista. Usa “Usar las preguntas ya escritas”."; return; }
@@ -1182,6 +1254,8 @@ function renderEditor(){
         <textarea data-k="pregunta" rows="3" aria-label="Pregunta ${i+1}" placeholder="Escribe aquí la pregunta">${esc(q.pregunta)}</textarea>
         <label class="ptsin">Puntos<input type="text" inputmode="decimal" data-p value="${inFmt(q.puntos ?? 1)}" aria-label="Puntos de la pregunta ${i+1}"></label>
       </div>
+      <div class="photos" data-qimgs="${i}">${(q.imgs || []).map((f, k) => `<div class="thumb"><img src="${imgSrc(f)}" alt="Imagen ${k + 1} de la pregunta ${i + 1}" data-zoom><button type="button" data-rmimg="${k}" aria-label="Quitar imagen ${k + 1}">Quitar</button></div>`).join("")}</div>
+      <div class="addphoto"><label class="btnlike" for="qi${i}">+ Imagen</label><input type="file" id="qi${i}" accept="image/*" multiple data-addimg="${i}"></div>
       <div class="row" style="gap:10px;align-items:center;justify-content:space-between">
         <label class="check" style="flex:1 1 auto"><input type="checkbox" data-f ${q.fotos?"checked":""}> El alumno puede subir fotos (para cálculos)</label>
         <button class="danger small" data-act="del" type="button">Quitar</button>
@@ -1197,6 +1271,16 @@ $("edList").addEventListener("input", e => {
     e.target.style.borderColor = v === null ? "var(--red)" : "";
     q.puntos = v; updateDraftTotal();
   }
+});
+$("edList").addEventListener("change", async e => {
+  const inp = e.target.closest("input[data-addimg]"); if (!inp) return;
+  const q = draft[+inp.dataset.addimg], files = [...inp.files]; inp.value = "";
+  for (const f of files) { try { q.imgs = [...(q.imgs || []), {...(await compress(f)), mime: "image/jpeg"}]; } catch {} }
+  renderEditor();
+});
+$("edList").addEventListener("click", e => {
+  const b = e.target.closest("button[data-rmimg]"); if (!b) return;
+  const q = draft[+b.closest("li").dataset.i]; q.imgs.splice(+b.dataset.rmimg, 1); renderEditor();
 });
 $("edList").addEventListener("change", e => {
   if (!e.target.hasAttribute("data-f")) return;
@@ -1217,7 +1301,8 @@ $("btnPub").onclick = async () => {
   const err = $("pubErr"); err.hidden = true;
   const fail = m => { err.textContent = m; err.hidden = false; };
   if (draft.some(q => q.puntos === null)) return fail("Hay puntajes no válidos (marcados en rojo). Usa números como 1, 2 o 1,5.");
-  const qs = draft.map(q => ({pregunta:q.pregunta.trim(), puntos:q.puntos, fotos:!!q.fotos})).filter(q => q.pregunta);
+  const keep = draft.filter(q => q.pregunta.trim() || q.imgs?.length);
+  const qs = keep.map(q => ({pregunta:q.pregunta.trim(), puntos:q.puntos, fotos:!!q.fotos, imgs:(q.imgs || []).length}));
   if (!qs.length) return fail("La evaluación necesita al menos una pregunta.");
   const e1 = checkStep1();
   if (e1) { showStep1(true); $("step1Err").textContent = e1; $("step1Err").hidden = false; $("step1").scrollIntoView({behavior:"smooth", block:"start"}); return fail("Revisa los datos del paso 1: " + e1); }
@@ -1228,6 +1313,13 @@ $("btnPub").onclick = async () => {
   try {
     const nuevo = {titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()};
     const ref = await withTimeout(db.collection("tests").add(nuevo), 20000);
+    let imgFail = 0;
+    for (let i = 0; i < keep.length; i++) for (let k = 0; k < (keep[i].imgs || []).length; k++) {
+      const f = keep[i].imgs[k];
+      try { await withTimeout(db.doc(`fotos/pq_${ref.id}_${i}_${k}`).set({resultId: "pregunta:" + ref.id, testId: ref.id, q: i, k, data: f.data, w: f.w, h: f.h, mime: f.mime || "image/jpeg"}), 30000); }
+      catch { imgFail++; }
+    }
+    if (imgFail) toast(`La evaluación se publicó, pero ${imgFail === 1 ? "1 imagen no se pudo guardar" : imgFail + " imágenes no se pudieron guardar"}. Revisa tu conexión.`, "info");
     secOpen = salon;
     db.doc("config/docInfo").set({...doc, salon}).catch(()=>{});
     resetCreate();
@@ -1504,11 +1596,12 @@ async function openRow(id){
     return `<li><div class="qbody">
       <div class="qhead"><div class="qtext">${esc(q.pregunta)}</div>
         <label class="ptsin">de ${fmt(ptsOf(q))}<input type="text" inputmode="decimal" data-rp="${i}" value="${r.puntos ? inFmt(r.puntos[i] ?? 0) : ""}" placeholder="0" aria-label="Puntos asignados en la pregunta ${i+1}"></label></div>
+      <div class="qimgs" data-rqimg="${i}"></div>
       <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div>
       <div class="photos" data-ph="${i}"></div>
       <label class="comment">Comentario para el alumno (opcional)<textarea data-rc="${i}" rows="2" placeholder="Ej: Buen razonamiento, pero faltó indicar las unidades.">${esc(r.comentarios?.[i] || "")}</textarea></label>
     </div></li>`; }).join("");
-  revTotal(); renderResProgress();
+  revTotal(); renderResProgress(); fillQImgs(r.testId, "data-rqimg");
   const locked = r.estado === "anulada" || r.estado === "en_curso" || r.estado === "inasistencia";
   const noteText = r.estado === "anulada"
     ? `Sospecha de uso de IA: la evaluación se anuló automáticamente. Motivo: ${r.motivo || "no registrado"} Abajo ves lo que el alumno había escrito. Si fue un fallo del sistema, quita la sospecha para calificarla o permite que la rinda de nuevo.`
@@ -1774,6 +1867,7 @@ $("btnStart").onclick = async () => {
   $("takeList").innerHTML = t.preguntas.map((q,i) => `
     <li data-i="${i}"><div class="qbody">
       <div class="qhead"><div class="qtext">${esc(q.pregunta)}</div><span class="pts">${plural(ptsOf(q),"pt")}</span></div>
+      <div class="qimgs" data-tqimg="${i}"></div>
       <textarea class="answer" id="ans${i}" aria-label="Tu respuesta a la pregunta ${i+1}" placeholder="Escribe tu respuesta y explica tu razonamiento" spellcheck="false" autocomplete="off" autocorrect="off" writingsuggestions="false"></textarea>
       ${q.fotos ? `<div class="addphoto">
         ${isTouch ? `<label class="btnlike" for="cam${i}" data-grace>Tomar foto</label><input type="file" id="cam${i}" accept="image/*" capture="environment" data-ph="${i}">` : ""}
@@ -1784,6 +1878,7 @@ $("btnStart").onclick = async () => {
   $("takeErr").hidden = true; $("takeConfirm").hidden = true;
   salidas = 0; lastSaved = ""; $("saveState").textContent = "";
   $("aWarn").hidden = true; $("aTake").hidden = false; updateProgress(); startTimer(); arm(); window.scrollTo({top:0});
+  fillQImgs(t.id, "data-tqimg");
 };
 
 /* Vigilancia durante la evaluación */
@@ -1995,8 +2090,9 @@ function showDone(r, repeated, auto){
   $("doneList").innerHTML = (r.preguntas||[]).map((q,i) => {
     const ans = String(r.respuestas?.[i] ?? "").trim();
     return `<li><div class="qbody"><div class="qhead"><div class="qtext">${esc(q.pregunta)}</div><span class="pts">${graded ? fmt(r.puntos?.[i] ?? 0) : "–"} / ${fmt(ptsOf(q))}</span></div>
+      <div class="qimgs" data-dqimg="${i}"></div>
       <div class="resp ${ans ? "" : "empty-ans"}">${ans ? esc(ans) : "Sin respuesta escrita."}</div><div class="photos" data-dph="${i}"></div>${graded && r.comentarios?.[i] ? `<div class="teacher-note"><b>Comentario del docente:</b> ${esc(r.comentarios[i])}</div>` : ""}</div></li>`; }).join("");
-  window.scrollTo({top:0});
+  window.scrollTo({top:0}); fillQImgs(r.testId, "data-dqimg");
   if ((r.fotos||[]).some(n => n > 0)) fotosOf(r.id).then(f => { if (shown?.id !== r.id) return; f.forEach((l,i) => { const el = document.querySelector(`[data-dph="${i}"]`); if (el && l) el.innerHTML = thumbs(l, false); }); }).catch(()=>{});
 }
 $("doneBack").onclick = showHome;
@@ -2009,9 +2105,10 @@ async function downloadDocx(r, btn){
   btn.disabled = true; say("Preparando documento…");
   try {
     const fotos = (r.fotos||[]).some(n => n > 0) ? await fotosOf(r.id) : [];
+    const qimgs = await qImgsOf(r.testId);
     const bytes = await DocxBuilder.build(JSZip, CREST, {
       info: {seccion: cleanSalon(r.salon), curso:r.doc?.curso||"", codigo:r.doc?.codigo||"", docente:DOCENTE, ciclo:r.doc?.ciclo||"", fecha:r.doc?.fecha||fmtDay(r.fecha)},
-      titulo:r.titulo, lista:r.lista, apellido:r.apellido, preguntas:r.preguntas||[], respuestas:r.respuestas||[], fotos,
+      titulo:r.titulo, lista:r.lista, apellido:r.apellido, preguntas:r.preguntas||[], qimgs, respuestas:r.respuestas||[], fotos,
       puntos: r.estado === "corregida" ? r.puntos : null, comentarios: r.estado === "corregida" ? r.comentarios : null, total:r.total, puntaje:r.puntaje||0, entregado: fmtDate(r.fecha), fmt});
     const name = asciiName(`${r.titulo} - ${String(r.lista).padStart(2,"0")} ${r.apellido}.docx`);
     await downloads.save({filename:name, data:bytes});
