@@ -499,36 +499,20 @@ input[type=datetime-local]{min-height:50px}
       <div class="sheet">
         <div class="sheet-head"><div><span class="step">Antes de empezar</span><h2 id="warnTitle"></h2><p class="muted" id="warnSub"></p></div></div>
         <div class="rules">
-          <h3>Tu evaluación se anulará automáticamente si:</h3>
-          <ol class="rulelist">
-            <li><b>Cambias de pestaña</b> o abres otra aplicación.</li>
-            <li><b>Minimizas el navegador</b> o vas a la pantalla de inicio del celular.</li>
-            <li><b>Sales de la ventana</b> de la evaluación (haces clic en otra ventana o programa) y no regresas en 3 segundos.</li>
-            <li><b>Usas pantalla dividida</b> o una ventana flotante en el celular o la tablet, o <b>achicas la ventana del navegador</b> en la computadora para ver otra cosa al lado.</li>
-            <li><b>Se bloquea o se apaga la pantalla</b> del celular, o contestas una llamada.</li>
-            <li><b>Se inserta de golpe un texto largo</b> en tus respuestas (por ejemplo, desde el portapapeles del teclado del celular o un dictado muy largo).</li>
-            <li><b>Copias o cortas texto</b>, incluso de tus propias respuestas.</li>
-            <li><b>Arrastras</b> texto o archivos hacia la evaluación.</li>
-            <li><b>Intentas abrir las herramientas del navegador</b> (F12 o Ctrl+Shift+I).</li>
-            <li><b>Cierras o recargas la página</b>, o sales sin entregar.</li>
-          </ol>
-          <p>Todo esto se considera <b>sospecha de uso de inteligencia artificial</b> u otra ayuda externa. Una evaluación anulada no se puede continuar. Solo tu docente puede habilitarte para rendirla de nuevo.</p>
-        </div>
-        <div class="box">
-          <h3>Lo que sí puedes hacer</h3>
-          <p>Subir fotos de tu desarrollo con los botones <b>Tomar foto</b> o <b>Elegir de la galería</b> (en computadora, <b>Subir fotos</b>). Mientras tomas o eliges la foto, la evaluación no se anula, pero debes volver en menos de <b>3 minutos</b>.</p>
-        </div>
-        <div class="box">
-          <h3>Antes de tocar “Empezar”</h3>
-          <ul class="tips">
-            <li>Activa el modo <b>No molestar</b> (o modo avión con Wi-Fi) para no recibir llamadas ni notificaciones.</li>
-            <li>La función de <b>pegar (Ctrl+V) está desactivada</b>: escribe todo con tu teclado.</li>
-            <li>Cierra las demás aplicaciones y pestañas, y usa el navegador a <b>pantalla completa</b> (en computadora, con la ventana maximizada).</li>
-            <li>Revisa que tengas batería y buena conexión a internet.</li>
-            <li>Si la pantalla de tu celular se apaga sola muy rápido, aumenta el tiempo de apagado automático.</li>
+          <h3>Tu evaluación se anula si:</h3>
+          <ul class="rulelist">
+            <li><b>Sales de la evaluación más de 5 segundos</b> (otra pestaña, app o ventana, minimizar o apagar la pantalla).</li>
+            <li><b>Usas pantalla dividida</b> o achicas la ventana.</li>
+            <li><b>Copias, cortas o arrastras texto</b>, o se pega de golpe un texto largo.</li>
+            <li><b>Cierras o recargas la página.</b></li>
           </ul>
+          <p class="small-text">Pegar (Ctrl+V) está desactivado. Si vuelves antes de 5 segundos, solo se pausa.</p>
         </div>
-        <label class="check"><input type="checkbox" id="warnOk"> Leí estas reglas y acepto que mi evaluación se anule si incumplo alguna.</label>
+        <div class="box">
+          <p><b>Sí puedes</b> subir fotos de tu desarrollo: tienes 3 minutos para volver. Todo se guarda solo, y si tu equipo se apaga se entrega lo que llevabas.</p>
+          <p class="muted small-text">Consejo: activa “No molestar” y usa el navegador en pantalla completa.</p>
+        </div>
+        <label class="check"><input type="checkbox" id="warnOk"> Entiendo las reglas.</label>
         <p class="err" id="warnErr" hidden></p>
         <div class="row"><button id="btnStart" type="button" disabled>Empezar evaluación</button><button class="ghost" id="warnBack" type="button">Volver</button></div>
       </div>
@@ -548,7 +532,7 @@ input[type=datetime-local]{min-height:50px}
           <button class="ghost small" id="takeConfirmNo" type="button">Seguir respondiendo</button>
         </div>
         <div class="sticky">
-          <div class="progress"><span><span id="progText"></span> · <span class="countdown" id="countdown"></span></span><div class="bar"><i id="progBar"></i></div></div>
+          <div class="progress"><span><span id="progText"></span> · <span class="countdown" id="countdown"></span></span><span class="small-text" id="saveState"></span><div class="bar"><i id="progBar"></i></div></div>
           <button type="submit" id="btnSubmit">Entregar</button>
         </div>
       </form>
@@ -574,7 +558,7 @@ input[type=datetime-local]{min-height:50px}
 <div class="guard-overlay" id="blurOverlay" hidden>
   <div class="guard-card">
     <b>¡Vuelve a la evaluación!</b>
-    <span class="big" id="blurCount">3</span>
+    <span class="big" id="blurCount">5</span>
     <span>Saliste de la ventana. Si no regresas, tu evaluación se anulará.</span>
     <button type="button" id="blurBack">Volver a la evaluación</button>
   </div>
@@ -912,7 +896,7 @@ $("rAlumno").onclick = () => pickRole("alumno");
 $("rProfe").onclick = () => pickRole("profe");
 function loginErr(m){ $("loginErr").textContent = m; $("loginErr").hidden = false; }
 
-$("fAlumno").onsubmit = e => {
+$("fAlumno").onsubmit = async e => {
   e.preventDefault();
   const lista = parseInt($("inLista").value,10), apellido = $("inApellido").value.trim();
   if (!lista || lista < 1) return loginErr("Escribe tu número de lista (un número desde 1).");
@@ -921,6 +905,15 @@ $("fAlumno").onsubmit = e => {
   if (!typed) return loginErr("Escribe tu sección (una letra, por ejemplo A).");
   const salon = salones().find(s => sameSec(s, typed)) || typed;
   if (!db || !dbReady) return loginErr(NO_CONN);
+  const btn = $("fAlumno").querySelector("button"); btn.disabled = true; btn.textContent = "Verificando…";
+  try {
+    const s = await withTimeout(db.collection("resultados").where("salon", "==", salon).get(), 12000);
+    const regs = s.docs.map(d => d.data());
+    const mismoApellido = regs.find(r => norm(r.apellido) === norm(apellido) && r.lista !== lista);
+    if (mismoApellido) return loginErr(`En la sección ${salon}, el apellido ${mismoApellido.apellido} ya está registrado con el N° ${mismoApellido.lista}. Revisa tu número de lista; si hay un error, avisa a tu docente.`);
+    if (regs.some(r => r.lista === lista && norm(r.apellido) !== norm(apellido))) return loginErr(`En la sección ${salon}, el N° ${lista} ya está registrado con otro apellido. Revisa tu número de lista y tu apellido.`);
+  } catch (er) { return loginErr(dbMsg(er, "No se pudieron verificar tus datos")); }
+  finally { btn.disabled = false; btn.textContent = "Entrar"; }
   session = {rol:"alumno", lista, apellido, salon};
   enter();
 };
@@ -950,13 +943,18 @@ function enter(){
   $("vAlumno").hidden = session.rol!=="alumno";
   if (session.rol==="profe") {
     secOpen = null; showTab(tests.length ? "tabLista" : "tabNueva"); autoPurge();
-    unsubAll = db.collection("resultados").onSnapshot(s => { allRes = s.docs.map(d => ({id:d.id, ...d.data()})); allResLoaded = true; renderTests(); autoPurge(); }, () => {});
+    unsubAll = db.collection("resultados").onSnapshot(s => {
+      allRes = s.docs.map(d => ({id:d.id, ...d.data()})); allResLoaded = true;
+      allRes.filter(r => { const t = tests.find(x => x.id === r.testId); return r.estado === "en_curso" && t && Date.now() > t.cierre + 120000 && !fixing.has(r.id); })
+        .forEach(r => { fixing.add(r.id); deliverDisconnected(r); });
+      renderTests(); autoPurge();
+    }, () => {});
   }
   if (session.rol==="alumno") {
     showHome();
     unsubMine = db.collection("resultados").where("lista","==",session.lista).onSnapshot(s => {
       myResults = s.docs.map(d => ({id:d.id, ...d.data()})).filter(r => norm(r.apellido) === norm(session.apellido) && (!r.salon || sameSec(r.salon, session.salon))).sort((a,b) => b.fecha - a.fecha);
-      myResults.filter(r => r.estado === "en_curso" && r.testId !== current?.id && !fixing.has(r.id)).forEach(r => { fixing.add(r.id); markAnnulled(r.id, storedMotivo(r.id) || ABANDON); });
+      myResults.filter(r => r.estado === "en_curso" && r.testId !== current?.id && !fixing.has(r.id)).forEach(r => { fixing.add(r.id); const mo = storedMotivo(r.id); mo ? markAnnulled(r.id, mo) : deliverDisconnected(r); });
       renderTests();
       if (shown) { const upd = myResults.find(r => r.id === shown.id); if (upd) showDone(upd, false); }
     }, () => {});
@@ -1359,7 +1357,7 @@ window.addEventListener("beforeunload", e => { if (revDirty) { e.preventDefault(
 const pendingRows = exceptId => resRows.filter(r => r.estado === "entregada" && r.id !== exceptId);
 function estadoChip(r){
   if (r.estado === "corregida") return '<span class="chip ok">CALIFICADA</span>';
-  if (r.estado === "entregada") return '<span class="chip brass">POR CALIFICAR</span>';
+  if (r.estado === "entregada") return '<span class="chip brass">POR CALIFICAR</span>' + (r.entregaAuto ? '<div class="cause" style="color:var(--warn)">Entregada por desconexión</div>' : "");
   if (r.estado === "anulada") return `<span class="chip red" title="${esc(r.motivo || "")}">SOSPECHA DE IA</span><div class="cause">${esc(causaCorta(r.motivo))}</div>`;
   if (r.estado === "inasistencia") return '<span class="chip ina">INASISTENCIA</span>';
   return resTest && Date.now() > resTest.cierre ? '<span class="chip off">NO ENTREGÓ</span>' : '<span class="chip">RINDIENDO</span>';
@@ -1517,7 +1515,9 @@ async function openRow(id){
     ? `Sospecha de uso de IA: la evaluación se anuló automáticamente. Motivo: ${r.motivo || "no registrado"} Abajo ves lo que el alumno había escrito. Si fue un fallo del sistema, quita la sospecha para calificarla o permite que la rinda de nuevo.`
     : r.estado === "en_curso" ? (resTest && Date.now() > resTest.cierre ? "El alumno empezó la evaluación pero no la entregó." : "El alumno está rindiendo la evaluación en este momento.")
     : r.estado === "inasistencia" ? `Examen anulado por inasistencia${r.anuladoInasistencia ? " el " + fmtDate(r.anuladoInasistencia) : ""}. Nota: 0. Si fue un error, quita la inasistencia.`
-    : r.sospechaRetirada ? `Quitaste la sospecha de IA de esta entrega (motivo original: ${r.sospechaRetirada.motivo || "no registrado"})` : "";
+    : [r.sospechaRetirada ? `Quitaste la sospecha de IA de esta entrega (motivo original: ${r.sospechaRetirada.motivo || "no registrado"})` : "",
+       r.entregaAuto ? `Entrega automática por desconexión: el alumno no volvió a la evaluación. Se guardó lo último que alcanzó a escribir${r.ultimoGuardado ? " (a las " + fmtHour(r.ultimoGuardado) + ")" : ""}.` : "",
+       r.salidas ? `Salió brevemente de la pantalla ${r.salidas === 1 ? "1 vez" : r.salidas + " veces"} (menos de 5 segundos cada vez).` : ""].filter(Boolean).join(" ");
   $("revNote").hidden = !noteText; $("revNote").textContent = noteText;
   $("revNote").className = "note " + (r.estado === "anulada" ? "bad" : "warn");
   $("revReopen").hidden = !(r.estado === "anulada" || r.estado === "en_curso");
@@ -1619,6 +1619,8 @@ $("absSave").onclick = async () => {
   if (!lista || lista < 1) return err("Escribe el número de lista del alumno.");
   if (apellido.length < 2) return err("Escribe el apellido paterno del alumno.");
   const id = `${t.id}_${lista}`, prevRow = resRows.find(x => x.id === id);
+  const sec = salonOf(t), mismo = allRes.find(r => sameSec(r.salon, sec) && norm(r.apellido) === norm(apellido) && r.lista !== lista);
+  if (!prevRow && mismo) return err(`En la sección ${sec}, el apellido ${mismo.apellido} ya está registrado con el N° ${mismo.lista}. Revisa el número de lista.`);
   if (prevRow?.estado === "inasistencia") return err(`N° ${lista} ya está anulado por inasistencia.`);
   if (prevRow && $("absSave").dataset.confirm !== id) {
     $("absSave").dataset.confirm = id; $("absSave").textContent = "Sí, anular de todos modos";
@@ -1676,8 +1678,11 @@ $("fClave").onsubmit = async e => {
 };
 
 /* ---------- Alumno: rendir ---------- */
-const GRACE_MS = 180000, BLUR_MS = 3000, LONG_INSERT = 60;
-const CAUSAS = [[/pantalla dividida/i, "Pantalla dividida o ventana reducida"], [/pestaña|aplicación|minimizó|pantalla\./i, "Cambió de pestaña o de aplicación"],
+const GRACE_MS = 180000, BLUR_MS = 5000, LONG_INSERT = 60, HIDE_MS = 5000;
+const HIDE_MOTIVO = "Dejó de ver la evaluación por más de 5 segundos (cambió de pestaña o de aplicación, minimizó el navegador o apagó la pantalla).";
+const DESCONEXION = "La evaluación quedó abierta sin entregarse (el dispositivo se apagó o perdió la conexión): se entregó automáticamente con lo último guardado.";
+let salidas = 0, saveT = null, lastSaved = "";
+const CAUSAS = [[/pantalla dividida/i, "Pantalla dividida o ventana reducida"], [/pestaña|aplicación|minimizó|pantalla\./i, "Dejó de ver la evaluación (pestaña, app o pantalla apagada)"],
   [/ventana de la evaluación/i, "Salió de la ventana"], [/copió|cortó/i, "Copió o cortó texto"], [/pegó/i, "Pegó texto"], [/arrastró/i, "Arrastró contenido"],
   [/de golpe/i, "Insertó texto largo de golpe"], [/herramientas/i, "Abrió herramientas del navegador"], [/sin entregarla/i, "Cerró o recargó la página"],
   [/3 minutos/i, "Tardó más de 3 minutos al subir fotos"]];
@@ -1702,6 +1707,11 @@ const ABANDON = "Salió de la evaluación sin entregarla (cerró, recargó o aba
 const isTouch = matchMedia("(pointer: coarse)").matches;
 let guardOn = false, grace = null, hiddenAt = 0, blurT = null, blurI = null, wakeLock = null, pendingTest = null;
 const fixing = new Set();
+async function deliverDisconnected(r){
+  const d = {estado: "entregada", entregaAuto: "desconexion", fecha: r.ultimoGuardado || r.iniciada || Date.now()};
+  try { await db.doc("resultados/" + r.id).update(d); } catch {}
+  return {...r, ...d};
+}
 function showHome(){ stopTimer(); disarm(); current = null; shown = null; pendingTest = null; ["aTake","aDone","aWarn"].forEach(id => $(id).hidden = true); $("aHome").hidden = false; renderTests(); }
 const resId = t => `${t.id}_${session.lista}`;
 const flagKey = id => "anulado_" + id;
@@ -1727,7 +1737,12 @@ async function openTake(t, b = {}){
     if (prev.exists) {
       const d = prev.data();
       if (norm(d.apellido) !== norm(session.apellido)) { b.disabled = false; showNote(`El número de lista ${session.lista} ya rindió "${t.titulo}" con otro apellido. Revisa tu número o avisa a tu docente.`); return; }
-      if (d.estado === "en_curso") { const motivo = storedMotivo(prev.id) || ABANDON; await markAnnulled(prev.id, motivo); showDone({id:prev.id, ...d, estado:"anulada", motivo}, true); return; }
+      if (d.estado === "en_curso") {
+        const motivo = storedMotivo(prev.id);
+        if (motivo) { await markAnnulled(prev.id, motivo); showDone({id:prev.id, ...d, estado:"anulada", motivo}, true); }
+        else showDone(await deliverDisconnected({id:prev.id, ...d}), true);
+        return;
+      }
       showDone({id:prev.id, ...d}, true); return;
     }
   } catch (er) { b.disabled = false; showNote(dbMsg(er, "No se pudo revisar tu evaluación")); return; }
@@ -1768,6 +1783,7 @@ $("btnStart").onclick = async () => {
       <div class="photos" data-phlist="${i}"></div>` : ""}
     </div></li>`).join("");
   $("takeErr").hidden = true; $("takeConfirm").hidden = true;
+  salidas = 0; lastSaved = ""; $("saveState").textContent = "";
   $("aWarn").hidden = true; $("aTake").hidden = false; updateProgress(); startTimer(); arm(); window.scrollTo({top:0});
 };
 
@@ -1786,22 +1802,29 @@ function startBlur(){
   if (!guardOn || grace || blurT) return;
   let n = Math.round(BLUR_MS/1000); $("blurCount").textContent = n; $("blurOverlay").hidden = false;
   blurI = setInterval(() => { n = Math.max(0, n - 1); $("blurCount").textContent = n; }, 1000);
-  blurT = setTimeout(() => { blurT = null; annul("Salió de la ventana de la evaluación por más de 3 segundos."); }, BLUR_MS);
+  blurT = setTimeout(() => { blurT = null; annul("Salió de la ventana de la evaluación por más de 5 segundos."); }, BLUR_MS);
 }
 function cancelBlur(){ clearTimeout(blurT); blurT = null; clearInterval(blurI); blurI = null; $("blurOverlay").hidden = true; }
 $("blurBack").onclick = () => { try { window.focus(); } catch {} cancelBlur(); };
 document.addEventListener("visibilitychange", () => {
   if (!guardOn) return;
   if (document.hidden) {
-    if (grace) { hiddenAt = Date.now(); return; }
-    annul("Cambió de pestaña o de aplicación, minimizó el navegador o se apagó la pantalla.");
-  } else {
-    if (grace) {
-      if (hiddenAt && Date.now() - hiddenAt > GRACE_MS) { annul("Tardó más de 3 minutos fuera de la evaluación al subir fotos."); return; }
-      hiddenAt = 0; endGrace(2500);
-    }
-    requestWake();
+    hiddenAt = Date.now();
+    if (!grace) { cancelBlur(); autoSave(true); }
+    return;
   }
+  const away = hiddenAt ? Date.now() - hiddenAt : 0; hiddenAt = 0;
+  if (grace) {
+    if (away > GRACE_MS) { annul("Tardó más de 3 minutos fuera de la evaluación al subir fotos."); return; }
+    endGrace(2500); requestWake(); return;
+  }
+  if (away > HIDE_MS) { annul(HIDE_MOTIVO); return; }
+  if (away > 0) {
+    salidas++;
+    if (current) db.doc("resultados/" + resId(current)).update({salidas}).catch(() => {});
+    toast(`Tu evaluación estuvo en pausa ${Math.max(1, Math.round(away / 1000))} s. Si dejas de verla más de 5 segundos, se anula.`, "info");
+  }
+  requestWake();
 });
 window.addEventListener("blur", () => { if (guardOn && !grace && !document.hidden) startBlur(); });
 window.addEventListener("focus", () => { cancelBlur(); if (grace) endGrace(1500); });
@@ -1836,7 +1859,24 @@ function annul(motivo){
 }
 
 /* Fotos y respuestas */
-$("takeList").addEventListener("input", updateProgress);
+$("takeList").addEventListener("input", () => { updateProgress(); scheduleSave(); });
+function scheduleSave(){ clearTimeout(saveT); saveT = setTimeout(() => autoSave(false), 2500); }
+async function autoSave(force){
+  if (!current || !guardOn) return;
+  clearTimeout(saveT);
+  const respuestas = current.preguntas.map((_, i) => ($("ans" + i)?.value || "").trim());
+  const fotos = takeFotos.map(l => l.length), key = JSON.stringify([respuestas, fotos]);
+  if (key === lastSaved && !force) return;
+  try {
+    await withTimeout(db.doc("resultados/" + resId(current)).update({respuestas, fotos, fotosBytes: takeFotos.flat().reduce((s, f) => s + (f.data?.length || 0), 0), ultimoGuardado: Date.now()}), 15000);
+    lastSaved = key; $("saveState").textContent = " · guardado " + fmtHour(Date.now());
+  } catch { $("saveState").textContent = " · sin conexión, se reintentará"; scheduleSave(); }
+}
+function uploadFoto(f){
+  f.up = db.doc("fotos/" + f.key).set({resultId: resId(current), testId: current.id, lista: session.lista, q: f.q, k: f.k, data: f.data, w: f.w, h: f.h});
+  f.up.catch(() => {});
+  return f.up;
+}
 $("takeList").addEventListener("cancel", e => { if (e.target.matches?.("input[data-ph]")) endGrace(800); }, true);
 $("takeList").addEventListener("change", async e => {
   const inp = e.target.closest("input[data-ph]"); if (!inp) return;
@@ -1845,14 +1885,22 @@ $("takeList").addEventListener("change", async e => {
   const files = [...inp.files].slice(0, MAX_FOTOS - takeFotos[i].length); inp.value = "";
   if (!files.length) { msg.textContent = `Ya tienes ${MAX_FOTOS} fotos en esta pregunta. Quita una para subir otra.`; return; }
   msg.textContent = "Preparando fotos…";
-  for (const f of files) { try { takeFotos[i].push(await compress(f)); } catch { msg.textContent = `No se pudo leer "${f.name}". Usa una foto JPG o PNG.`; } }
-  renderPhotos(i); updateProgress();
+  for (const f of files) {
+    try {
+      const ph = await compress(f), k = Date.now() + Math.random();
+      Object.assign(ph, {q: i, k, key: `${resId(current)}_${i}_${Math.round(k * 1000).toString(36)}`});
+      takeFotos[i].push(ph); uploadFoto(ph);
+    } catch { msg.textContent = `No se pudo leer "${f.name}". Usa una foto JPG o PNG.`; }
+  }
+  renderPhotos(i); updateProgress(); scheduleSave();
   if (msg.textContent === "Preparando fotos…") msg.textContent = `${takeFotos[i].length} de ${MAX_FOTOS} fotos.`;
 });
 $("takeList").addEventListener("click", e => {
   if (e.target.closest("[data-grace]")) { if (guardOn) startGrace(); return; }
   const b = e.target.closest("button[data-rm]"); if (!b) return;
-  const i = +b.closest("[data-phlist]").dataset.phlist; takeFotos[i].splice(+b.dataset.rm, 1); renderPhotos(i); updateProgress();
+  const i = +b.closest("[data-phlist]").dataset.phlist, [gone] = takeFotos[i].splice(+b.dataset.rm, 1);
+  if (gone?.key) db.doc("fotos/" + gone.key).delete().catch(() => {});
+  renderPhotos(i); updateProgress(); scheduleSave();
   document.querySelector(`[data-phmsg="${i}"]`).textContent = `${takeFotos[i].length} de ${MAX_FOTOS} fotos.`;
 });
 function renderPhotos(i){ document.querySelector(`[data-phlist="${i}"]`).innerHTML = thumbs(takeFotos[i], true); }
@@ -1899,9 +1947,9 @@ async function deliver(auto){
     const prev = await withTimeout(ref.get(), 15000);
     if (prev.exists && prev.data().estado !== "en_curso") { showDone({id, ...prev.data()}, true); return; }
     $("btnSubmit").textContent = "Enviando…";
-    for (let i = 0; i < takeFotos.length; i++)
-      for (let k = 0; k < takeFotos[i].length; k++)
-        await withTimeout(db.doc(`fotos/${id}_${i}_${k}`).set({resultId:id, testId:t.id, lista:session.lista, q:i, k, ...takeFotos[i][k]}), 30000);
+    for (const f of takeFotos.flat()) {
+      try { await withTimeout(f.up, 30000); } catch { await withTimeout(uploadFoto(f), 30000); }
+    }
     const data = {testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido, respuestas, fotos,
       preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), doc: {...(t.doc||{}), fecha: fmtDay(t.inicio)},
       estado:"entregada", puntos:null, puntaje:null, fecha:Date.now(), automatica:auto, fotosBytes: takeFotos.flat().reduce((s, f) => s + (f.data?.length || 0), 0)};
@@ -1939,6 +1987,7 @@ function showDone(r, repeated, auto){
     : annulled
     ? `Tu evaluación fue anulada por sospecha de uso de IA. Motivo: ${r.motivo || "se detectó una salida de la evaluación."} Si crees que fue un error, habla con tu docente: puede quitar la sospecha o habilitarte para rendirla de nuevo.`
     : (auto ? "El tiempo terminó y tu evaluación se entregó automáticamente. " : repeated ? "Ya habías entregado esta evaluación. " : "")
+      + (r.entregaAuto ? "Tu evaluación se entregó automáticamente con lo último que alcanzaste a guardar, porque quedó abierta sin entregarse. " : "")
       + (graded ? `Obtuviste ${fmt(r.puntaje)} de ${fmt(r.total)} puntos.` : `Tu docente aún no asigna el puntaje (entregada el ${fmtDate(r.fecha)}).`)
       + (keepUntil(r) ? ` Descarga tu Word: estará disponible hasta el ${keepUntil(r)}.` : "");
   $("docxMsg").textContent = annulled ? "" : downloads ? "" : "La descarga no está disponible en esta vista.";
