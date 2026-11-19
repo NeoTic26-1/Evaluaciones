@@ -201,6 +201,7 @@ tbody tr.ina td:first-child{box-shadow:inset 4px 0 0 #3f3a39}
 .comment textarea{font-weight:400;font-size:16px;color:var(--fg);min-height:64px}
 .teacher-note{padding:12px 14px;border-radius:10px;background:var(--pri-soft);border-left:4px solid var(--pri);white-space:pre-wrap;overflow-wrap:anywhere}
 input[readonly]:not(#inSalonA){background:var(--bg);color:var(--muted);cursor:default}
+.cause{font-size:13px;font-weight:700;color:var(--red);white-space:normal;margin-top:4px;line-height:1.3}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:16px;padding:8px 16px;border-radius:999px;background:var(--paper);color:var(--fg);border:1.5px solid var(--line-strong)}
 .pill:hover:not(:disabled){background:var(--pri-soft);border-color:var(--pri)}
@@ -503,6 +504,7 @@ input[type=datetime-local]{min-height:50px}
             <li><b>Cambias de pestaña</b> o abres otra aplicación.</li>
             <li><b>Minimizas el navegador</b> o vas a la pantalla de inicio del celular.</li>
             <li><b>Sales de la ventana</b> de la evaluación (haces clic en otra ventana o programa) y no regresas en 3 segundos.</li>
+            <li><b>Usas pantalla dividida</b> o una ventana flotante en el celular o la tablet, o <b>achicas la ventana del navegador</b> en la computadora para ver otra cosa al lado.</li>
             <li><b>Se bloquea o se apaga la pantalla</b> del celular, o contestas una llamada.</li>
             <li><b>Se inserta de golpe un texto largo</b> en tus respuestas (por ejemplo, desde el portapapeles del teclado del celular o un dictado muy largo).</li>
             <li><b>Copias o cortas texto</b>, incluso de tus propias respuestas.</li>
@@ -521,7 +523,7 @@ input[type=datetime-local]{min-height:50px}
           <ul class="tips">
             <li>Activa el modo <b>No molestar</b> (o modo avión con Wi-Fi) para no recibir llamadas ni notificaciones.</li>
             <li>La función de <b>pegar (Ctrl+V) está desactivada</b>: escribe todo con tu teclado.</li>
-            <li>Cierra las demás aplicaciones y pestañas.</li>
+            <li>Cierra las demás aplicaciones y pestañas, y usa el navegador a <b>pantalla completa</b> (en computadora, con la ventana maximizada).</li>
             <li>Revisa que tengas batería y buena conexión a internet.</li>
             <li>Si la pantalla de tu celular se apaga sola muy rápido, aumenta el tiempo de apagado automático.</li>
           </ul>
@@ -1307,7 +1309,7 @@ function renderTests(){
       </div>`; }).join("") : '<div class="empty">No tienes evaluaciones pendientes. Cuando tu profesor publique una, aparecerá aquí.</div>';
     $("aPast").innerHTML = myResults.length ? myResults.map(r => `
       <div class="test${r.estado === "anulada" ? " sus" : r.estado === "inasistencia" ? " ina" : ""}" data-rid="${esc(r.id)}">
-        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? '<span class="chip red">ANULADA · SOSPECHA DE IA</span>' : r.estado === "inasistencia" ? '<span class="chip ina">ANULADA · INASISTENCIA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "inasistencia" ? "Nota: 0" : (r.estado === "anulada" ? "Anulada " : "Entregada ") + fmtDate(r.fecha)}${r.estado !== "anulada" && r.estado !== "inasistencia" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
+        <div class="meta"><h3>${esc(r.titulo)}</h3><div class="who">${r.estado === "corregida" ? `<span class="chip ok">${fmt(r.puntaje)} / ${fmt(r.total)}</span>` : r.estado === "anulada" ? `<span class="chip red">ANULADA · SOSPECHA DE IA</span><span class="cause">Motivo: ${esc(causaCorta(r.motivo))}</span>` : r.estado === "inasistencia" ? '<span class="chip ina">ANULADA · INASISTENCIA</span>' : r.estado === "en_curso" ? '<span class="chip">EN CURSO</span>' : '<span class="chip brass">EN CORRECCIÓN</span>'}<span>${r.estado === "inasistencia" ? "Nota: 0" : (r.estado === "anulada" ? "Anulada " : "Entregada ") + fmtDate(r.fecha)}${r.estado !== "anulada" && r.estado !== "inasistencia" && keepUntil(r) ? ` · disponible hasta el ${keepUntil(r)}` : ""}</span></div></div>
         <div class="actions"><button class="small" data-act="view" type="button">Ver</button>${r.estado === "anulada" || r.estado === "en_curso" || r.estado === "inasistencia" ? "" : '<button class="ghost small" data-act="docx" type="button">Descargar Word</button>'}</div>
       </div>`).join("") : '<div class="empty">Todavía no has entregado evaluaciones.</div>';
   }
@@ -1358,7 +1360,7 @@ const pendingRows = exceptId => resRows.filter(r => r.estado === "entregada" && 
 function estadoChip(r){
   if (r.estado === "corregida") return '<span class="chip ok">CALIFICADA</span>';
   if (r.estado === "entregada") return '<span class="chip brass">POR CALIFICAR</span>';
-  if (r.estado === "anulada") return `<span class="chip red" title="${esc(r.motivo || "")}">SOSPECHA DE IA</span>`;
+  if (r.estado === "anulada") return `<span class="chip red" title="${esc(r.motivo || "")}">SOSPECHA DE IA</span><div class="cause">${esc(causaCorta(r.motivo))}</div>`;
   if (r.estado === "inasistencia") return '<span class="chip ina">INASISTENCIA</span>';
   return resTest && Date.now() > resTest.cierre ? '<span class="chip off">NO ENTREGÓ</span>' : '<span class="chip">RINDIENDO</span>';
 }
@@ -1675,6 +1677,27 @@ $("fClave").onsubmit = async e => {
 
 /* ---------- Alumno: rendir ---------- */
 const GRACE_MS = 180000, BLUR_MS = 3000, LONG_INSERT = 60;
+const CAUSAS = [[/pantalla dividida/i, "Pantalla dividida o ventana reducida"], [/pestaña|aplicación|minimizó|pantalla\./i, "Cambió de pestaña o de aplicación"],
+  [/ventana de la evaluación/i, "Salió de la ventana"], [/copió|cortó/i, "Copió o cortó texto"], [/pegó/i, "Pegó texto"], [/arrastró/i, "Arrastró contenido"],
+  [/de golpe/i, "Insertó texto largo de golpe"], [/herramientas/i, "Abrió herramientas del navegador"], [/sin entregarla/i, "Cerró o recargó la página"],
+  [/3 minutos/i, "Tardó más de 3 minutos al subir fotos"]];
+const causaCorta = motivo => (CAUSAS.find(([re]) => re.test(motivo || "")) || [, "Motivo no registrado"])[1];
+const SPLIT_MOTIVO = "Usó pantalla dividida, una ventana flotante o una ventana reducida (podía ver otra aplicación al lado).";
+// La página ocupa solo una parte de la pantalla: pantalla dividida, ventana flotante o ventana achicada.
+function splitScreen(){
+  if (matchMedia("(pointer: coarse)").matches) {
+    const land = matchMedia("(orientation: landscape)").matches;
+    const sw = land ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    return !!sw && window.innerWidth < sw * 0.8;
+  }
+  const aw = screen.availWidth, ah = screen.availHeight;
+  return !!aw && (window.outerWidth < aw * 0.8 || window.outerHeight < ah * 0.75);
+}
+let splitT = null, splitHits = 0;
+function checkSplit(){
+  if (!guardOn || grace) { splitHits = 0; return; }
+  if (splitScreen()) { if (++splitHits >= 2) annul(SPLIT_MOTIVO); } else splitHits = 0;
+}
 const ABANDON = "Salió de la evaluación sin entregarla (cerró, recargó o abandonó la página).";
 const isTouch = matchMedia("(pointer: coarse)").matches;
 let guardOn = false, grace = null, hiddenAt = 0, blurT = null, blurI = null, wakeLock = null, pendingTest = null;
@@ -1721,6 +1744,9 @@ $("btnStart").onclick = async () => {
   const t = pendingTest; if (!t) return;
   const err = m => { $("warnErr").textContent = m; $("warnErr").hidden = false; };
   if (statusOf(t) !== "abierta") return err("Esta evaluación ya no está abierta.");
+  if (splitScreen()) return err(matchMedia("(pointer: coarse)").matches
+    ? "Sal de la pantalla dividida o de la ventana flotante y usa el navegador a pantalla completa para poder empezar."
+    : "Maximiza la ventana del navegador (que ocupe toda la pantalla) para poder empezar. No la acomodes al lado de otra ventana.");
   $("btnStart").disabled = true;
   current = t; takeFotos = t.preguntas.map(() => []);
   try {
@@ -1746,8 +1772,8 @@ $("btnStart").onclick = async () => {
 };
 
 /* Vigilancia durante la evaluación */
-function arm(){ guardOn = true; $("logout").hidden = true; requestWake(); }
-function disarm(){ guardOn = false; cancelBlur(); if (grace) { clearTimeout(grace.t); grace = null; } releaseWake(); $("logout").hidden = false; }
+function arm(){ guardOn = true; $("logout").hidden = true; requestWake(); splitHits = 0; clearInterval(splitT); splitT = setInterval(checkSplit, 1500); }
+function disarm(){ guardOn = false; clearInterval(splitT); splitT = null; cancelBlur(); if (grace) { clearTimeout(grace.t); grace = null; } releaseWake(); $("logout").hidden = false; }
 async function requestWake(){ try { wakeLock = (await navigator.wakeLock?.request("screen")) || null; } catch { wakeLock = null; } }
 function releaseWake(){ try { wakeLock?.release(); } catch {} wakeLock = null; }
 function startGrace(){ if (grace) clearTimeout(grace.t); grace = {t: setTimeout(graceExpired, GRACE_MS)}; hiddenAt = 0; cancelBlur(); }
