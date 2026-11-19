@@ -775,13 +775,15 @@ const STATUS_CHIP = {proxima:'<span class="chip brass">PRÓXIMA</span>', abierta
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
   } };
   $("dbNote").hidden = true;
+  const watchdog = setTimeout(() => { if (!dbReady) showNote(NO_CONN); }, 12000);
   db.collection("tests").onSnapshot(s => {
+    if (!dbReady) { dbReady = true; clearTimeout(watchdog); if ($("dbNote").textContent === NO_CONN) $("dbNote").hidden = true; }
     tests = s.docs.map(d => ({id:d.id, ...d.data()})).filter(t => t.inicio && t.cierre).sort((a,b)=>(b.inicio||0)-(a.inicio||0));
     fillSalones();
     renderTests();
     autoPurge();
     applyLink();
-  }, e => showNote("No se pudieron cargar las evaluaciones (" + (e.code || e.message) + "). Revisa las reglas de Firestore."));
+  }, e => { clearTimeout(watchdog); showNote(e.code === "permission-denied" ? "La base de datos no permite el acceso (permiso denegado). Avisa al encargado de la página." : NO_CONN); });
 })();
 // Conservación: cada evaluación se guarda MAX_DAYS días después de su cierre y luego se borra.
 const MAX_DAYS = 30, MIN_DAYS = 30, LIMIT_BYTES = 1e9, BUDGET_BYTES = 0.7e9;
@@ -843,6 +845,12 @@ function fillSalones(){
 }
 let toastT = null;
 function toast(msg, kind){ const t = $("toast"); t.textContent = msg; t.className = "toast" + (kind ? " " + kind : ""); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 4000); }
+const NO_CONN = "No hay conexión con la base de datos. Revisa tu internet e inténtalo otra vez. Si sigue pasando, la base de datos no está respondiendo: avisa al encargado de la página.";
+function withTimeout(pr, ms = 15000){
+  return Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(Object.assign(new Error("la base de datos no respondió a tiempo"), {code: "timeout"})), ms))]);
+}
+const dbMsg = (er, base) => er?.code === "timeout" || er?.code === "unavailable" ? NO_CONN : er?.code === "permission-denied" ? "La base de datos rechazó la operación (permiso denegado). Avisa al encargado de la página." : base + ": " + (er?.message || "error") + ".";
+let dbReady = false;
 function showNote(m){ $("dbNote").textContent = m; $("dbNote").hidden = false; }
 setInterval(() => { if (session && !current) renderTests(); }, 30000);
 
@@ -911,7 +919,7 @@ $("fAlumno").onsubmit = e => {
   const typed = cleanSalon($("inSalonA").value);
   if (!typed) return loginErr("Escribe tu sección (una letra, por ejemplo A).");
   const salon = salones().find(s => sameSec(s, typed)) || typed;
-  if (!db) return loginErr("Sin conexión a la base de datos. Revisa tu internet y vuelve a cargar la página.");
+  if (!db || !dbReady) return loginErr(NO_CONN);
   session = {rol:"alumno", lista, apellido, salon};
   enter();
 };
@@ -919,7 +927,13 @@ $("fProfe").onsubmit = async e => {
   e.preventDefault();
   const h = await sha($("inClave").value);
   let stored = await sha(DEFAULT_CLAVE);
-  if (db) { try { const c = await db.doc("config/main").get(); if (c.exists && c.data().claveHash) stored = c.data().claveHash; } catch {} }
+  if (!db) return loginErr(NO_CONN);
+  const btn = $("fProfe").querySelector("button"); btn.disabled = true; btn.textContent = "Verificando…";
+  let c;
+  try { c = await withTimeout(db.doc("config/main").get(), 10000); }
+  catch (er) { return loginErr(dbMsg(er, "No se pudo verificar la clave")); }
+  finally { btn.disabled = false; btn.textContent = "Entrar"; }
+  if (c.exists && c.data().claveHash) stored = c.data().claveHash;
   if (h !== stored) return loginErr("Clave incorrecta. Inténtalo de nuevo.");
   $("inClave").value = "";
   session = {rol:"profe"};
@@ -1215,14 +1229,14 @@ $("btnPub").onclick = async () => {
   $("btnPub").disabled = true;
   try {
     const nuevo = {titulo: $("inTitulo").value.trim(), preguntas: qs, puntajeTotal: r2(qs.reduce((s,q)=>s+q.puntos,0)), inicio, cierre, salon, doc, creado: Date.now()};
-    const ref = await db.collection("tests").add(nuevo);
+    const ref = await withTimeout(db.collection("tests").add(nuevo), 20000);
     secOpen = salon;
     db.doc("config/docInfo").set({...doc, salon}).catch(()=>{});
     resetCreate();
     toast("Evaluación publicada.");
     showTab("tabLista");
     showPublished({id: ref.id, ...nuevo});
-  } catch (e) { fail("No se pudo publicar: " + e.message); }
+  } catch (e) { fail(e?.code === "timeout" ? NO_CONN + " Antes de volver a publicar, revisa en «Mis evaluaciones» que no se haya creado igual." : dbMsg(e, "No se pudo publicar")); }
   finally { $("btnPub").disabled = false; }
 };
 
@@ -1545,7 +1559,7 @@ async function saveGrade(advance){
   try {
     const puntaje = r2(v.reduce((s,x)=>s+x,0));
     const comentarios = [...document.querySelectorAll("#revList [data-rc]")].map(x => x.value.trim());
-    await db.doc("resultados/"+r.id).update({puntos:v, puntaje, comentarios, estado:"corregida", corregido:Date.now()});
+    await withTimeout(db.doc("resultados/"+r.id).update({puntos:v, puntaje, comentarios, estado:"corregida", corregido:Date.now()}));
     Object.assign(r, {puntos:v, puntaje, comentarios, estado:"corregida"});
     revDirty = false;
     const next = nextPending(r);
@@ -1555,7 +1569,7 @@ async function saveGrade(advance){
       else { closeRev(); renderResProgress(); $("resBox").scrollIntoView({behavior:"smooth", block:"start"}); }
     } else renderResProgress();
     return true;
-  } catch (e) { $("revMsg").textContent = "No se pudo guardar: " + e.message + ". Inténtalo otra vez."; return false; }
+  } catch (e) { $("revMsg").textContent = dbMsg(e, "No se pudo guardar la nota"); return false; }
   finally { $("revSave").disabled = false; }
 }
 $("revSave").onclick = () => saveGrade(true);
@@ -1687,14 +1701,14 @@ async function openTake(t, b = {}){
   if (statusOf(t) !== "abierta") { renderTests(); return; }
   b.disabled = true;
   try {
-    const prev = await db.doc("resultados/" + resId(t)).get();
+    const prev = await withTimeout(db.doc("resultados/" + resId(t)).get(), 12000);
     if (prev.exists) {
       const d = prev.data();
       if (norm(d.apellido) !== norm(session.apellido)) { b.disabled = false; showNote(`El número de lista ${session.lista} ya rindió "${t.titulo}" con otro apellido. Revisa tu número o avisa a tu docente.`); return; }
       if (d.estado === "en_curso") { const motivo = storedMotivo(prev.id) || ABANDON; await markAnnulled(prev.id, motivo); showDone({id:prev.id, ...d, estado:"anulada", motivo}, true); return; }
       showDone({id:prev.id, ...d}, true); return;
     }
-  } catch (er) { b.disabled = false; showNote("No se pudo revisar tu evaluación: " + (er?.message || "error") + ". Vuelve a intentarlo."); return; }
+  } catch (er) { b.disabled = false; showNote(dbMsg(er, "No se pudo revisar tu evaluación")); return; }
   b.disabled = false;
   pendingTest = t;
   $("warnTitle").textContent = t.titulo;
@@ -1711,10 +1725,10 @@ $("btnStart").onclick = async () => {
   $("btnStart").disabled = true;
   current = t; takeFotos = t.preguntas.map(() => []);
   try {
-    await db.doc("resultados/" + resId(t)).set({testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido,
+    await withTimeout(db.doc("resultados/" + resId(t)).set({testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido,
       preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), doc: {...(t.doc||{}), fecha: fmtDay(t.inicio)},
-      estado:"en_curso", iniciada:Date.now(), fecha:Date.now(), respuestas:[], fotos:[], puntos:null, puntaje:null});
-  } catch (er) { current = null; $("btnStart").disabled = false; return err("No se pudo iniciar: " + (er?.message || "error") + ". Vuelve a intentarlo."); }
+      estado:"en_curso", iniciada:Date.now(), fecha:Date.now(), respuestas:[], fotos:[], puntos:null, puntaje:null}), 15000);
+  } catch (er) { current = null; $("btnStart").disabled = false; return err(dbMsg(er, "No se pudo iniciar")); }
   pendingTest = null;
   $("takeTitle").textContent = t.titulo;
   $("takeSub").textContent = `${nPreg(t)} · ${plural(totalOf(t),"punto")} · termina a las ${fmtHour(t.cierre)}`;
@@ -1857,20 +1871,20 @@ async function deliver(auto){
   const fotos = takeFotos.map(l => l.length);
   try {
     const ref = db.doc("resultados/" + id);
-    const prev = await ref.get();
+    const prev = await withTimeout(ref.get(), 15000);
     if (prev.exists && prev.data().estado !== "en_curso") { showDone({id, ...prev.data()}, true); return; }
     $("btnSubmit").textContent = "Enviando…";
     for (let i = 0; i < takeFotos.length; i++)
       for (let k = 0; k < takeFotos[i].length; k++)
-        await db.doc(`fotos/${id}_${i}_${k}`).set({resultId:id, testId:t.id, lista:session.lista, q:i, k, ...takeFotos[i][k]});
+        await withTimeout(db.doc(`fotos/${id}_${i}_${k}`).set({resultId:id, testId:t.id, lista:session.lista, q:i, k, ...takeFotos[i][k]}), 30000);
     const data = {testId:t.id, salon:salonOf(t), titulo:t.titulo, lista:session.lista, apellido:session.apellido, respuestas, fotos,
       preguntas: t.preguntas.map(q => ({pregunta:q.pregunta, puntos:ptsOf(q)})), total: totalOf(t), doc: {...(t.doc||{}), fecha: fmtDay(t.inicio)},
       estado:"entregada", puntos:null, puntaje:null, fecha:Date.now(), automatica:auto, fotosBytes: takeFotos.flat().reduce((s, f) => s + (f.data?.length || 0), 0)};
-    await ref.set(data);
+    await withTimeout(ref.set(data), 20000);
     try { localStorage.removeItem(flagKey(id)); } catch {}
     stopTimer(); showDone({id, ...data}, false, auto);
   } catch (er) {
-    $("takeErr").textContent = (["quota_exceeded", "resource-exhausted"].includes(er?.code) ? "La base de datos está llena. Avisa a tu docente para que elimine evaluaciones antiguas." : "No se pudo entregar: " + (er?.message || "error") + ".") + " Tus respuestas siguen aquí; vuelve a intentarlo.";
+    $("takeErr").textContent = (["quota_exceeded", "resource-exhausted"].includes(er?.code) ? "La base de datos está llena. Avisa a tu docente para que elimine evaluaciones antiguas." : dbMsg(er, "No se pudo entregar")) + " Tus respuestas siguen aquí; vuelve a intentarlo.";
     $("takeErr").hidden = false;
     if (current && !auto) arm();
   } finally { submitting = false; $("btnSubmit").disabled = false; $("btnSubmit").textContent = "Entregar"; }
