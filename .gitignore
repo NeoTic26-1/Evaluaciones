@@ -1,0 +1,8 @@
+# Configuración con la clave de Firebase: se genera al publicar desde el secreto FIREBASE_API_KEY.
+firebase-config.js
+
+# Archivos del sistema y de herramientas
+.DS_Store
+Thumbs.db
+node_modules/
+*.log

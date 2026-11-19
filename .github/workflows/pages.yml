@@ -1,0 +1,46 @@
+name: Publicar página
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Crear firebase-config.js con la clave del secreto
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        run: |
+          if [ -z "$FIREBASE_API_KEY" ]; then
+            echo "::error::Falta el secreto FIREBASE_API_KEY (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          sed "s|TU_CLAVE_DE_API|${FIREBASE_API_KEY}|" firebase-config.example.js > firebase-config.js
+
+      - name: Preparar archivos
+        run: |
+          mkdir _site
+          cp -r index.html firebase-config.js img _site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
