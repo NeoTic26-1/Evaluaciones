@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Test de Laboratorios UNI-FIIS</title>
 <meta name="description" content="Test de Laboratorios UNI-FIIS: el docente crea y califica; los alumnos rinden y descargan su evaluación en Word.">
-<link rel="icon" type="image/png" href="img/favicon.png">
-<link rel="apple-touch-icon" href="img/favicon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%A6%90%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
@@ -42,7 +41,7 @@ p{margin:0}
 header.top{display:flex;justify-content:space-between;align-items:center;gap:14px 18px;flex-wrap:wrap;padding:18px 22px;border-radius:18px;background:linear-gradient(135deg,var(--uni),var(--uni-deep));color:#fff;box-shadow:0 12px 28px -18px rgba(90,10,6,.7)}
 .brand-id{display:flex;align-items:center;gap:16px;min-width:0;flex:1 1 300px}
 .seal{flex:0 0 auto;width:74px;height:74px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 0 0 3px rgba(255,255,255,.22)}
-.seal img{width:57px;height:auto;display:block}
+.seal span{font-size:42px;line-height:1;display:block;transform:translateY(2px)}
 header.top h1{color:#fff;font-size:clamp(22px,4.6vw,31px)}
 header.top h1 span{color:var(--gold);white-space:nowrap}
 .brand-sub{color:rgba(255,255,255,.82);font-size:15px;margin-top:4px;line-height:1.35}
@@ -50,7 +49,7 @@ header.top .who{color:rgba(255,255,255,.9)}
 header.top .who .chip{background:rgba(255,255,255,.16);color:#fff}
 header.top #logout{background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}
 header.top #logout:hover:not(:disabled){background:rgba(255,255,255,.14);border-color:#fff}
-@media (max-width:480px){.seal{width:60px;height:60px}.seal img{width:47px}.brand-sub{font-size:14px}}
+@media (max-width:480px){.seal{width:60px;height:60px}.seal span{font-size:34px}.brand-sub{font-size:14px}}
 .who{font-size:17px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
 .sheet{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,4vw,30px);display:flex;flex-direction:column;gap:20px;min-width:0}
@@ -225,7 +224,7 @@ input[type=datetime-local]{min-height:50px}
 <div class="wrap">
   <header class="top">
     <div class="brand-id">
-      <span class="seal"><img src="img/escudo-uni.png" alt="Escudo de la Universidad Nacional de Ingeniería" width="50" height="61"></span>
+      <span class="seal" aria-hidden="true"><span>🦐</span></span>
       <div>
         <h1>Test de Laboratorios <span>UNI-FIIS</span></h1>
         <p class="brand-sub">Universidad Nacional de Ingeniería · Facultad de Ingeniería Industrial y de Sistemas</p>
